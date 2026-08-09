@@ -1,0 +1,7 @@
+{
+  // Backend edge functions run on Deno — let the Deno LSP handle them so
+  // `jsr:` / `npm:` / URL imports resolve. Everything else (the Expo/React
+  // Native app in frontend/) stays on the normal TypeScript server.
+  "deno.enablePaths": ["backend"],
+  "deno.enable": false
+}
