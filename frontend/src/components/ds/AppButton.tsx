@@ -90,7 +90,10 @@ const VARIANT_STYLE = StyleSheet.create({
 const styles = StyleSheet.create({
   base: {
     position: "relative",
-    width: "100%",
+    // Stretch to full width inside column layouts (forms, sheets) — RN's default cross-axis
+    // stretch — without forcing 100% width when placed inline in a row (e.g. next to a text
+    // block), which would otherwise crush its siblings and overflow the container.
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

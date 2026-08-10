@@ -1,45 +1,63 @@
-import { View, Text, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { colors } from "../theme/tokens";
+import { Screen } from "../components/ds/Screen";
+import { NavBar } from "../components/ds/NavBar";
+import { Badge } from "../components/ds/Badge";
+import { AppButton } from "../components/ds/AppButton";
+import { BottomNav, type TabKey } from "../components/app/BottomNav";
+
+export type NavLink = { label: string; onPress?: () => void };
 
 /**
- * Placeholder home screen.
+ * Generic not-yet-implemented screen: shows the screen name and buttons to navigate to the
+ * screens it connects to. Used for every module owned by other teammates.
  *
- * This project was scaffolded from the folder structure of the original app
- * WITHOUT its screens. Build real screens under `src/screens/` and wire them
- * into `src/navigation/RootStack.tsx`, then remove this file.
+ * Pass `tab` to render the app's BottomNav (like the reference app) for the top-level tab
+ * screens (Home / Safety / Profile); the History tab is the real Incidents screen.
  */
-export function PlaceholderScreen() {
+export function PlaceholderScreen({
+  title,
+  onBack,
+  links = [],
+  tab,
+  onTab,
+  onSos,
+  onAssistant,
+}: {
+  title: string;
+  onBack?: () => void;
+  links?: NavLink[];
+  tab?: TabKey;
+  onTab?: (t: TabKey) => void;
+  onSos?: () => void;
+  onAssistant?: () => void;
+}) {
   return (
-    <SafeAreaView style={styles.screen} testID="placeholder-screen">
-      <View style={styles.center}>
-        <Text style={styles.title}>WomenSafty</Text>
-        <Text style={styles.subtitle}>Starter scaffold — add your screens in src/screens</Text>
-      </View>
-    </SafeAreaView>
+    <Screen>
+      <NavBar title={title} onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Text style={styles.heading}>{title}</Text>
+          <Badge tone="warning">Not implemented yet</Badge>
+        </View>
+        {links.length > 0 ? <Text style={styles.label}>GO TO</Text> : null}
+        <View style={styles.links}>
+          {links.map((l, i) => (
+            <AppButton key={`${l.label}-${i}`} variant={i === 0 ? "primary" : "secondary"} size="md" onPress={l.onPress}>
+              {l.label}
+            </AppButton>
+          ))}
+        </View>
+      </ScrollView>
+      {tab ? <BottomNav active={tab} onSelect={onTab} onSos={onSos} onAssistant={onAssistant} /> : null}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    gap: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: colors.foreground,
-  },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    color: colors.mutedForeground,
-  },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32 },
+  hero: { alignItems: "flex-start", gap: 10, marginBottom: 28 },
+  heading: { fontSize: 30, fontWeight: "700", color: colors.foreground, letterSpacing: -0.4 },
+  label: { fontSize: 12, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.6, marginBottom: 10 },
+  links: { gap: 10 },
 });

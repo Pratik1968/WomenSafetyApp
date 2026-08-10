@@ -1,0 +1,2 @@
+# Supabase CLI project config. `project_id` is a local name for this workspace.
+project_id = "womensafty"

@@ -24,6 +24,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        { "photosPermission": "Allow access to attach photos and videos as evidence." }
+      ],
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident." }
+      ]
+    ]
   }
 }
