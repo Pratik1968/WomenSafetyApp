@@ -301,9 +301,6 @@ function HomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamLi
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
       }}
-      onQuickActionLongPress={(action: string) => {
-        if (action === "Fake Call") navigation.navigate("FakeCall");
-      }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
         else if (t === "history") navigation.navigate("History");

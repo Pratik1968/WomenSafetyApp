@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Animated, Easing, StyleSheet, Platform, PermissionsAndroid } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Users, Bluetooth, Bell, Camera as CameraIcon, Footprints, MapPin, Mic as MicIcon, Phone, MessageSquare, ShieldCheck, type LucideIcon } from "lucide-react-native";
@@ -11,6 +11,7 @@ import { ProgressBar } from "../components/ds/ProgressBar";
 import { Dialog } from "../components/ds/Dialog";
 import { AppButton } from "../components/ds/AppButton";
 import { colors } from "../theme/tokens";
+import { deviceRegistrationService } from "../services/deviceRegistrationService";
 
 export type PermissionKey = "location" | "notifications" | "contacts" | "activity" | "microphone" | "camera" | "bluetooth" | "send_sms" | "call_phone";
 export type PermissionState = "ask" | "requesting" | "granted" | "denied";
@@ -73,7 +74,7 @@ export const PERMISSIONS: PermissionSpec[] = [
     title: "Send Emergency SMS",
     reason: "To silently alert your contacts the moment you trigger SOS.",
     detail:
-      "When SOS is activated, Aegis sends an SMS with your GPS location to all emergency contacts immediately ΓÇö without opening any SMS app or requiring you to tap Send. This is the fastest way to get a message out.",
+      "When SOS is activated, Aegis sends an SMS with your GPS location to all emergency contacts immediately — without opening any SMS app or requiring you to tap Send. This is the fastest way to get a message out.",
     systemBody: "Allow Aegis to send SMS messages?",
     deniedBody:
       "Without this permission, emergency SMS alerts cannot be sent automatically. You will need to send them manually.",
@@ -84,7 +85,7 @@ export const PERMISSIONS: PermissionSpec[] = [
     title: "Place Emergency Calls",
     reason: "To auto-dial your primary contact when SOS activates.",
     detail:
-      "Aegis auto-calls your primary emergency contact when SOS is triggered ΓÇö no need to unlock your phone or navigate to the dialer. The call is placed immediately after the SMS is sent.",
+      "Aegis auto-calls your primary emergency contact when SOS is triggered — no need to unlock your phone or navigate to the dialer. The call is placed immediately after the SMS is sent.",
     systemBody: "Allow Aegis to make phone calls?",
     deniedBody:
       "Without this permission, Aegis cannot auto-dial your emergency contact. You will need to call manually.",
@@ -111,16 +112,24 @@ export const JUST_IN_TIME_PERMISSIONS: Record<string, PermissionSpec> = {
     systemBody: "Allow Aegis to detect motion & activity?",
     deniedBody: "Safety Mode will not be able to auto-detect falls.",
   },
-  bluetooth: {
-    key: "bluetooth",
-    icon: Bluetooth,
-    title: "Bluetooth Devices",
-    reason: "To connect smartwatches or panic buttons.",
-    detail: "Scans for nearby wearable panic buttons or smartwatches.",
-    systemBody: "Allow Aegis to access Bluetooth?",
-    deniedBody: "Unable to connect wearable hardware panic buttons.",
-  },
 };
+
+async function fetchAndRegisterPushToken(): Promise<void> {
+  try {
+    if (Platform.OS === "android" && typeof Notifications?.setNotificationChannelAsync === "function") {
+      // Required on Android 13+ before a device push token can be issued.
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+      });
+    }
+    if (typeof Notifications?.getDevicePushTokenAsync !== "function") return;
+    const { data: fcmToken } = await Notifications.getDevicePushTokenAsync();
+    await deviceRegistrationService.registerDeviceToken(fcmToken);
+  } catch (err) {
+    console.warn("Failed to fetch/register push token:", err);
+  }
+}
 
 export async function requestNativePermission(key: PermissionKey): Promise<boolean> {
   try {
@@ -139,6 +148,9 @@ export async function requestNativePermission(key: PermissionKey): Promise<boole
     } else if (key === "notifications") {
       if (typeof Notifications?.requestPermissionsAsync === "function") {
         const { status } = await Notifications.requestPermissionsAsync();
+        if (status === "granted") {
+          await fetchAndRegisterPushToken();
+        }
         return status === "granted";
       }
     } else if (key === "contacts") {
@@ -152,7 +164,17 @@ export async function requestNativePermission(key: PermissionKey): Promise<boole
         return status === "granted";
       }
     } else if (key === "microphone") {
-      if (typeof ExpoCamera?.requestMicrophonePermissionsAsync === "function") {
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: "Microphone Access Required",
+            message: "Aegis requires microphone access to record audio evidence during emergency alerts and for voice activation.",
+            buttonPositive: "Allow",
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } else if (typeof ExpoCamera?.requestMicrophonePermissionsAsync === "function") {
         const { status } = await ExpoCamera.requestMicrophonePermissionsAsync();
         return status === "granted";
       }

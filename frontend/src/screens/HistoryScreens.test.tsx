@@ -1,4 +1,4 @@
-﻿import { render, screen, cleanup } from "@testing-library/react-native";
+import { render, screen, cleanup } from "@testing-library/react-native";
 import { HistoryScreen, IncidentDetailScreen } from "./HistoryScreens";
 
 afterEach(() => {

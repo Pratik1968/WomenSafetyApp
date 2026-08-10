@@ -1,24 +1,24 @@
-﻿/**
+/**
  * sosOrchestratorService.ts
  *
  * Central SOS pipeline orchestrator. This is the single source of truth for
  * "what happens when SOS is triggered." All trigger sources (button, shake,
  * future: volume-button, widget) funnel through triggerSOS().
  *
- * Pipeline (in order, each step is best-effort ΓÇö failures logged but don't abort):
+ * Pipeline (in order, each step is best-effort — failures logged but don't abort):
  *   1. Acquire current GPS location (with last-known-location fallback)
  *   2. Load emergency contacts from contactStorageService
  *   3. Send silent SMS to all contacts  (via sosNativeService)
  *   4. Place silent call to primary contact (via sosNativeService)
  *   5. Show persistent "SOS Active" local notification (via expo-notifications)
  *   6. Persist incident to AsyncStorage (for History screen)
- *   7. Start live location watch ΓåÆ append location updates to incident log
+ *   7. Start live location watch → append location updates to incident log
  *
  * Exports:
- *   triggerSOS(source)      ΓåÆ Promise<string>  (returns incidentId)
- *   cancelSOS(incidentId)   ΓåÆ Promise<void>
- *   getIncidents()          ΓåÆ Promise<SOSIncident[]>
- *   getActiveIncidentId()   ΓåÆ string | null
+ *   triggerSOS(source)      → Promise<string>  (returns incidentId)
+ *   cancelSOS(incidentId)   → Promise<void>
+ *   getIncidents()          → Promise<SOSIncident[]>
+ *   getActiveIncidentId()   → string | null
  */
 
 import { Platform, PermissionsAndroid } from "react-native";
@@ -28,9 +28,9 @@ import * as Notifications from "expo-notifications";
 import { contactStorageService } from "./contactStorageService";
 import { sendSilentSms, makeSilentCall } from "./sosNativeService";
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Types
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 export type SOSTriggerSource = "BUTTON" | "SHAKE";
 
@@ -60,9 +60,9 @@ export interface SOSIncident {
   timeline: SOSLogEntry[];
 }
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Constants
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 const INCIDENTS_STORAGE_KEY = "@aegis_incidents_v2";
 const LAST_LOCATION_KEY = "@aegis_last_known_location";
@@ -73,16 +73,16 @@ const LIVE_LOCATION_DISTANCE_M = 10;      // 10 metres
 const SOS_NOTIFICATION_CHANNEL_ID = "sos-alerts";
 const SOS_NOTIFICATION_ID_PREFIX = "sos-active-";
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Module-level state (in-memory; re-initialised on app restart)
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 let activeIncidentId: string | null = null;
 let locationWatcher: Location.LocationSubscription | null = null;
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Helpers
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 function generateIncidentId(): string {
   return `sos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -102,7 +102,7 @@ async function cacheLocation(loc: SOSLocation): Promise<void> {
   try {
     await AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(loc));
   } catch {
-    // Non-critical ΓÇö best effort
+    // Non-critical — best effort
   }
 }
 
@@ -124,7 +124,7 @@ async function acquireLocation(): Promise<SOSLocation | null> {
     await cacheLocation(loc);
     return loc;
   } catch {
-    // GPS unavailable ΓÇö use last known location as fallback
+    // GPS unavailable — use last known location as fallback
     const cached = await getCachedLocation();
     if (cached) return { ...cached, accurate: false };
     return null;
@@ -208,7 +208,7 @@ async function setupNotificationChannel(): Promise<void> {
       enableVibrate: true,
     });
   } catch {
-    // Channel creation may fail on iOS or older Android ΓÇö non-critical
+    // Channel creation may fail on iOS or older Android — non-critical
   }
 }
 
@@ -217,7 +217,7 @@ async function showSOSActiveNotification(incidentId: string): Promise<void> {
     await Notifications.scheduleNotificationAsync({
       identifier: `${SOS_NOTIFICATION_ID_PREFIX}${incidentId}`,
       content: {
-        title: "≡ƒÜ¿ SOS Activated",
+        title: "🚨 SOS Activated",
         body: "Emergency alerts sent. Tap to open SOS screen. Shake to cancel.",
         data: { incidentId },
         sticky: true,
@@ -239,9 +239,9 @@ async function dismissSOSNotification(incidentId: string): Promise<void> {
   }
 }
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Public API
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 /**
  * Returns the currently active SOS incident ID, or null if no SOS is active.
@@ -259,7 +259,7 @@ export async function getIncidents(): Promise<SOSIncident[]> {
 }
 
 /**
- * Main SOS trigger ΓÇö runs the full emergency pipeline.
+ * Main SOS trigger — runs the full emergency pipeline.
  *
  * @param source - 'BUTTON' (user pressed the SOS button) or 'SHAKE' (shake trigger)
  * @returns The incidentId (use to track / cancel this incident)
@@ -271,7 +271,7 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   const incidentId = generateIncidentId();
   activeIncidentId = incidentId;
 
-  // ΓöÇΓöÇ Step 1: Create incident record immediately ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 1: Create incident record immediately ──────────────
   const incident: SOSIncident = {
     id: incidentId,
     source,
@@ -288,7 +288,7 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   incidents.unshift(incident);
   await writeIncidents(incidents);
 
-  // ΓöÇΓöÇ Step 2: Get location (with fallback) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 2: Get location (with fallback) ────────────────────
   const location = await acquireLocation();
   await patchIncident(incidentId, (inc) => ({ ...inc, location }));
   if (location) {
@@ -299,13 +299,13 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     });
   }
 
-  // ΓöÇΓöÇ Step 3: Load emergency contacts ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 3: Load emergency contacts ────────────────────────
   const contacts = await contactStorageService.getStoredEmergencyContacts();
   const phones = contacts
     .map((c) => (c.phone ?? "").replace(/\s+/g, ""))
     .filter(Boolean);
 
-  // ΓöÇΓöÇ Step 4: Build SOS message ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 4: Build SOS message ──────────────────────────────
   const mapsLink = location
     ? `https://maps.google.com/?q=${location.lat},${location.lon}`
     : "Location unavailable";
@@ -314,12 +314,12 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     minute: "2-digit",
   });
   const message =
-    `≡ƒÜ¿ SOS ALERT from Aegis Safety App\n` +
+    `🚨 SOS ALERT from Aegis Safety App\n` +
     `I need immediate help! (${timeStr})\n` +
     `My location: ${mapsLink}\n` +
     `Please call me or come to my location.`;
 
-  // ΓöÇΓöÇ Step 5: Send silent SMS to all contacts ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 5: Send silent SMS to all contacts ─────────────────
   if (phones.length > 0) {
     const smsSent = await sendSilentSms(phones, message);
     await appendLog(incidentId, "SMS_SENT", {
@@ -334,7 +334,7 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     await appendLog(incidentId, "SMS_SKIPPED", { reason: "No contacts configured" });
   }
 
-  // ΓöÇΓöÇ Step 6: Call primary contact silently ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 6: Call primary contact silently ───────────────────
   if (phones.length > 0) {
     // Short delay so SMS is dispatched before we lock the phone in a call
     await new Promise((r) => setTimeout(r, 800));
@@ -345,11 +345,11 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     });
   }
 
-  // ΓöÇΓöÇ Step 7: Show persistent notification ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 7: Show persistent notification ───────────────────
   await setupNotificationChannel();
   await showSOSActiveNotification(incidentId);
 
-  // ΓöÇΓöÇ Step 8: Start live location watch ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Step 8: Start live location watch ──────────────────────
   try {
     locationWatcher = await Location.watchPositionAsync(
       {

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import {
   Siren,
@@ -25,7 +25,7 @@ import {
   type SOSIncident,
 } from "../services/sosOrchestratorService";
 
-// Static mock data for non-SOS entries (journeys, reports) ΓÇö will be replaced
+// Static mock data for non-SOS entries (journeys, reports) — will be replaced
 // when those features integrate with the orchestrator.
 const MOCK_INCIDENTS = [
   { id: "mock-1", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
@@ -91,7 +91,7 @@ export function HistoryScreen({
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>History</Text>
-        <Text style={styles.headerSub}>Every journey, alert and report ΓÇö kept only on your account.</Text>
+        <Text style={styles.headerSub}>Every journey, alert and report — kept only on your account.</Text>
       </View>
 
       {state !== "empty" ? (
@@ -139,7 +139,7 @@ export function HistoryScreen({
                       </View>
                       <View style={styles.incidentTextWrap}>
                         <View style={styles.incidentTopRow}>
-                          <Text style={styles.incidentTitle}>SOS ΓÇö {triggerLabel}</Text>
+                          <Text style={styles.incidentTitle}>SOS — {triggerLabel}</Text>
                           <Text style={styles.incidentDate}>{formatDate(inc.startTime)}</Text>
                         </View>
                         <Text style={styles.incidentPlace}>{locText}</Text>
@@ -202,9 +202,9 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
           </View>
           <View style={styles.detailHeaderTextWrap}>
             <Text style={styles.detailHeaderTitle}>SOS triggered</Text>
-            <Text style={styles.detailHeaderSub}>12 Jun 2026 ┬╖ 9:42 PM ┬╖ 100 Ft Road underpass</Text>
+            <Text style={styles.detailHeaderSub}>12 Jun 2026 · 9:42 PM · 100 Ft Road underpass</Text>
             <View style={styles.badgeWrap}>
-              <Badge tone="success">Resolved ┬╖ you marked yourself safe</Badge>
+              <Badge tone="success">Resolved · you marked yourself safe</Badge>
             </View>
           </View>
         </View>
@@ -229,9 +229,9 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
             <Sparkles size={17} color={colors.primary} />
             <Text style={styles.aiTitle}>What Aegis noticed</Text>
           </View>
-          <Text style={styles.aiBullet}>ΓÇó Stopped moving for 4 minutes in a normally walked stretch.</Text>
-          <Text style={styles.aiBullet}>ΓÇó Route deviated 180 m from the planned path.</Text>
-          <Text style={styles.aiBullet}>ΓÇó Similar reports here peak between 9 PM and 11 PM.</Text>
+          <Text style={styles.aiBullet}>• Stopped moving for 4 minutes in a normally walked stretch.</Text>
+          <Text style={styles.aiBullet}>• Route deviated 180 m from the planned path.</Text>
+          <Text style={styles.aiBullet}>• Similar reports here peak between 9 PM and 11 PM.</Text>
         </Card>
 
         {/* Timeline */}
@@ -256,8 +256,8 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
             <Mic size={20} color={colors.primary} />
           </View>
           <View style={styles.evidenceTextWrap}>
-            <Text style={styles.evidenceTitle}>Audio ┬╖ 8 min 42 s</Text>
-            <Text style={styles.evidenceSub}>Encrypted ┬╖ stored on your device only</Text>
+            <Text style={styles.evidenceTitle}>Audio · 8 min 42 s</Text>
+            <Text style={styles.evidenceSub}>Encrypted · stored on your device only</Text>
           </View>
         </Card>
       </ScrollView>

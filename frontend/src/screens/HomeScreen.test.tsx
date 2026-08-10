@@ -1,4 +1,4 @@
-﻿import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
+import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
 import { HomeScreen } from "./HomeScreen";
 
 afterEach(() => {
@@ -9,7 +9,7 @@ describe("HomeScreen", () => {
   it("renders user greeting and status pill correctly", async () => {
     await render(<HomeScreen />);
     expect(screen.getByText("Good evening,")).toBeTruthy();
-    expect(screen.getByText("Aisha")).toBeTruthy();
+    expect(screen.getByText("User")).toBeTruthy();
     expect(screen.getByText("You're in a safe area")).toBeTruthy();
   });
 
@@ -28,7 +28,7 @@ describe("HomeScreen", () => {
     await act(async () => {
       fireEvent.press(screen.getByLabelText("Press and hold to send SOS"));
     });
-    expect(screen.getByText("SOS activatingΓÇª")).toBeTruthy();
+    expect(screen.getByText("SOS activating…")).toBeTruthy();
   });
 
   it("renders quick actions grid items", async () => {

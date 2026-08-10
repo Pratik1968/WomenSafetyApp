@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   PhoneCall,
   Waves,
   MapPin,
+  HeartHandshake,
 } from "lucide-react-native";
 import { colors, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
@@ -32,15 +33,15 @@ import {
 } from "../services/sosOrchestratorService";
 import { contactStorageService } from "../services/contactStorageService";
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Types
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 export type SosState = "active" | "confirm" | "cancelled";
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // LiveRow sub-component
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 function LiveRow({
   icon: Icon,
@@ -78,9 +79,9 @@ function LiveRow({
   );
 }
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Utility: format elapsed seconds as MM:SS
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -88,9 +89,9 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s}`;
 }
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 // Main SosScreen
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
 
 export function SosScreen({
   state = "active",
@@ -101,31 +102,31 @@ export function SosScreen({
   onDeleteRecordings,
 }: {
   state?: SosState;
-  /** What triggered this SOS ΓÇö used by the orchestrator */
+  /** What triggered this SOS — used by the orchestrator */
   triggerSource?: SOSTriggerSource;
   onEnd?: () => void;
   onCancelConfirm?: () => void;
   onDone?: () => void;
   onDeleteRecordings?: () => void;
 }) {
-  // ΓöÇΓöÇ Location label ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Location label ─────────────────────────────────────────
   const [mapLabel, setMapLabel] = useState<string | null>(null);
 
-  // ΓöÇΓöÇ Elapsed timer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Elapsed timer ──────────────────────────────────────────
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0); // non-React ref for closure safety
 
-  // ΓöÇΓöÇ Incident duration for "cancelled" summary ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Incident duration for "cancelled" summary ──────────────
   const [finalDuration, setFinalDuration] = useState<string | null>(null);
 
-  // ΓöÇΓöÇ Real contact names ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  const [contactNames, setContactNames] = useState<string>("LoadingΓÇª");
+  // ── Real contact names ─────────────────────────────────────
+  const [contactNames, setContactNames] = useState<string>("Loading…");
 
-  // ΓöÇΓöÇ SOS pipeline state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── SOS pipeline state ─────────────────────────────────────
   const incidentIdRef = useRef<string | null>(null);
 
-  // ΓöÇΓöÇ Load contacts on mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Load contacts on mount ─────────────────────────────────
   useEffect(() => {
     contactStorageService.getStoredEmergencyContacts().then((contacts) => {
       if (contacts.length === 0) {
@@ -139,7 +140,7 @@ export function SosScreen({
     });
   }, []);
 
-  // ΓöÇΓöÇ Elapsed timer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Elapsed timer ──────────────────────────────────────────
   const startTimer = useCallback(() => {
     if (timerRef.current) return; // already running
     timerRef.current = setInterval(() => {
@@ -155,7 +156,7 @@ export function SosScreen({
     }
   }, []);
 
-  // ΓöÇΓöÇ Main SOS pipeline (fires when state becomes 'active') ΓöÇΓöÇ
+  // ── Main SOS pipeline (fires when state becomes 'active') ──
   useEffect(() => {
     if (state !== "active") return;
 
@@ -184,7 +185,7 @@ export function SosScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  // ΓöÇΓöÇ When state changes to cancelled ΓÇö stop timer, resolve SOS ΓöÇ
+  // ── When state changes to cancelled — stop timer, resolve SOS ─
   useEffect(() => {
     if (state === "cancelled") {
       setFinalDuration(formatElapsed(elapsedRef.current));
@@ -198,7 +199,7 @@ export function SosScreen({
     }
   }, [state, stopTimer]);
 
-  // ΓöÇΓöÇ Cancelled / "safe" screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Cancelled / "safe" screen ──────────────────────────────
   if (state === "cancelled") {
     return (
       <View style={styles.cancelledScreen}>
@@ -228,7 +229,7 @@ export function SosScreen({
     );
   }
 
-  // ΓöÇΓöÇ Active / confirm screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Active / confirm screen ────────────────────────────────
   return (
     <View style={styles.activeScreen}>
       <View style={styles.activeContent}>
@@ -246,7 +247,7 @@ export function SosScreen({
         <View style={styles.mapStub}>
           <MapPin size={16} color={colors.emergency} />
           <Text style={styles.mapStubText} numberOfLines={1}>
-            {mapLabel ?? "Acquiring locationΓÇª"}
+            {mapLabel ?? "Acquiring location…"}
           </Text>
         </View>
 
@@ -284,19 +285,25 @@ export function SosScreen({
 
         {/* Footer actions */}
         <View style={styles.footerActions}>
-          {/* Call police directly */}
-          <Pressable
-            style={styles.callPoliceBtn}
-            onPress={() => Linking.openURL("tel:112").catch(console.warn)}
-            accessibilityLabel="Call police emergency number 112"
-          >
-            <PhoneCall
-              size={19}
-              color={colors.emergencyForeground}
-              strokeWidth={2}
-            />
-            <Text style={styles.callPoliceText}>Call police ┬╖ 112</Text>
-          </Pressable>
+          <View style={styles.helplineButtonsRow}>
+            <Pressable
+              style={styles.callHelplineBtn}
+              onPress={() => Linking.openURL("tel:112").catch(console.warn)}
+              accessibilityLabel="Call Police Helpline 112"
+            >
+              <PhoneCall size={18} color={colors.emergencyForeground} strokeWidth={2} />
+              <Text style={styles.callPoliceText}>Call police · 112</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.callHelplineBtn, { backgroundColor: `${colors.emergencyForeground}30` }]}
+              onPress={() => Linking.openURL("tel:1091").catch(console.warn)}
+              accessibilityLabel="Call Women Helpline 1091"
+            >
+              <HeartHandshake size={18} color={colors.emergencyForeground} strokeWidth={2} />
+              <Text style={styles.callPoliceText}>Women Helpline · 1091</Text>
+            </Pressable>
+          </View>
 
           {/* End emergency (long press) */}
           <Pressable
@@ -336,9 +343,9 @@ export function SosScreen({
   );
 }
 
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// Styles (unchanged from original ΓÇö colours + spacing preserved)
-// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ──────────────────────────────────────────────────────────────
+// Styles (unchanged from original — colours + spacing preserved)
+// ──────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   activeScreen: { flex: 1, backgroundColor: colors.emergency },
@@ -429,20 +436,18 @@ const styles = StyleSheet.create({
     color: colors.emergencyForeground,
   },
   footerActions: { gap: 10, paddingTop: 16 },
-  callPoliceBtn: {
+  helplineButtonsRow: { flexDirection: "row", gap: 10 },
+  callHelplineBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    height: 56,
+    gap: 8,
+    height: 52,
     backgroundColor: `${colors.emergencyForeground}25`,
     borderRadius: radii.xl,
   },
-  callPoliceText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.emergencyForeground,
-  },
+  callPoliceText: { fontSize: 15, fontWeight: "700", color: colors.emergencyForeground },
   endEmergencyBtn: {
     height: 56,
     backgroundColor: colors.background,

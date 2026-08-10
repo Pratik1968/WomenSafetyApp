@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SosCountdownOverlay.tsx
  *
  * Full-screen modal overlay shown between the SOS trigger event and the actual
@@ -9,11 +9,11 @@
  *   - HomeScreen (shake trigger)
  *
  * Props:
- *   visible        ΓÇö controls Modal visibility
- *   onFire         ΓÇö called when countdown reaches 0 (SOS should activate)
- *   onCancel       ΓÇö called when user taps "Cancel" or countdown is dismissed
- *   triggerSource  ΓÇö 'BUTTON' | 'SHAKE' (shown in subtitle for context)
- *   durationSecs   ΓÇö countdown length in seconds (default: 4)
+ *   visible        — controls Modal visibility
+ *   onFire         — called when countdown reaches 0 (SOS should activate)
+ *   onCancel       — called when user taps "Cancel" or countdown is dismissed
+ *   triggerSource  — 'BUTTON' | 'SHAKE' (shown in subtitle for context)
+ *   durationSecs   — countdown length in seconds (default: 4)
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -54,7 +54,7 @@ export function SosCountdownOverlay({
   // Ring expansion animation (repeating)
   const ring = useRef(new Animated.Value(0)).current;
 
-  // ΓöÇΓöÇ Start / reset when overlay becomes visible ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Start / reset when overlay becomes visible ─────────────
   useEffect(() => {
     if (!visible) return;
 
@@ -137,7 +137,7 @@ export function SosCountdownOverlay({
           {secondsLeft}
         </Animated.Text>
 
-        <Text style={styles.activatingLabel}>SOS activatingΓÇª</Text>
+        <Text style={styles.activatingLabel}>SOS activating…</Text>
         <Text style={styles.triggerSource}>{triggerLabel}</Text>
 
         {/* Progress bar */}
@@ -162,7 +162,7 @@ export function SosCountdownOverlay({
           accessibilityLabel="Cancel SOS"
           accessibilityRole="button"
         >
-          <Text style={styles.cancelText}>Cancel ΓÇö I'm Safe</Text>
+          <Text style={styles.cancelText}>Cancel — I'm Safe</Text>
         </Pressable>
 
         <Text style={styles.hint}>
