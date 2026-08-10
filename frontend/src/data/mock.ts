@@ -4,6 +4,7 @@ export type PhoneContact = {
   initials: string;
   phone: string;
   relation: string;
+  priority?: number;
 };
 
 export const PHONE_CONTACTS: PhoneContact[] = [
