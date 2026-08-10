@@ -122,7 +122,9 @@ const withSafetyAndroidFiles = (config) => {
         'EmergencyPackage.kt',
         'NotificationActionReceiver.kt',
         'SafetyForegroundService.kt',
-        'SafetyTileService.kt'
+        'SafetyTileService.kt',
+        'SOSModule.kt',
+        'ShakeModule.kt'
       ];
 
       for (const file of files) {

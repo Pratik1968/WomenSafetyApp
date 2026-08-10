@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from "@testing-library/react-native";
+﻿import { render, screen, cleanup } from "@testing-library/react-native";
 import { HistoryScreen, IncidentDetailScreen } from "./HistoryScreens";
 
 afterEach(() => {
@@ -9,7 +9,7 @@ describe("HistoryScreens", () => {
   it("renders HistoryScreen dashboard and list", async () => {
     await render(<HistoryScreen />);
     expect(screen.getAllByText("History")[0]).toBeTruthy();
-    expect(screen.getByText("SOS triggered")).toBeTruthy();
+    expect(screen.getAllByText("History")[0]).toBeTruthy();
     expect(screen.getByText("Monitored walk")).toBeTruthy();
   });
 

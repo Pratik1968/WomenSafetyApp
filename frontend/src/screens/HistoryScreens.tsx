@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import {
   Siren,
@@ -20,30 +20,47 @@ import { EmptyState } from "../components/ds/EmptyState";
 import { NavBar } from "../components/ds/NavBar";
 import { TimelineItem } from "../components/ds/TimelineItem";
 import { BottomNav, type TabKey } from "../components/app/BottomNav";
+import {
+  getIncidents,
+  type SOSIncident,
+} from "../services/sosOrchestratorService";
 
-export type HistoryState = "default" | "empty" | "loading";
-
-const INCIDENTS = [
-  { id: "1", kind: "sos" as const, title: "SOS triggered", place: "100 Ft Road underpass", date: "12 Jun", status: "resolved" as const },
-  { id: "2", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
-  { id: "3", kind: "report" as const, title: "Area report", place: "5th Cross stretch", date: "04 Jun", status: "under-review" as const },
+// Static mock data for non-SOS entries (journeys, reports) ΓÇö will be replaced
+// when those features integrate with the orchestrator.
+const MOCK_INCIDENTS = [
+  { id: "mock-1", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
+  { id: "mock-2", kind: "report" as const, title: "Area report", place: "5th Cross stretch", date: "04 Jun", status: "under-review" as const },
 ];
 
-const INCIDENT_TIMELINE = [
+const MOCK_INCIDENT_TIMELINE = [
   { id: "s1", time: "9:42 PM", title: "SOS button held", detail: "Pressed for 3 seconds on 100 Ft Road.", tone: "emergency" as const },
   { id: "s2", time: "9:42 PM", title: "Contacts notified", detail: "Amma, Meera & Nanna received SMS and call alert.", tone: "brand" as const },
   { id: "s3", time: "9:43 PM", title: "Audio & video started", detail: "Continuous encrypted background recording.", tone: "brand" as const },
-  { id: "s4", time: "9:46 PM", title: "Marked safe", detail: "You entered PIN and ended the emergency.", tone: "success" as const },
+  { id: "s4", time: "9:46 PM", title: "Marked safe", detail: "You ended the emergency.", tone: "success" as const },
 ];
 
 const STATUS = {
   resolved: { label: "Resolved", tone: "success" as const },
+  active:   { label: "Active", tone: "warning" as const },
   safe: { label: "Arrived safely", tone: "success" as const },
   "under-review": { label: "Under review", tone: "warning" as const },
   cancelled: { label: "Cancelled", tone: "neutral" as const },
 };
 
 const FILTERS = ["All", "SOS", "Journeys", "Reports"];
+
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+}
+
+
+export type HistoryState = "default" | "empty" | "loading";
 
 export function HistoryScreen({
   state = "default",
@@ -59,12 +76,22 @@ export function HistoryScreen({
   onSos?: () => void;
 }) {
   const [filter, setFilter] = useState("All");
+  const [realSosIncidents, setRealSosIncidents] = useState<SOSIncident[]>([]);
+  const [loadingIncidents, setLoadingIncidents] = useState(true);
+
+  // Load real SOS incidents from AsyncStorage on mount
+  useEffect(() => {
+    getIncidents()
+      .then(setRealSosIncidents)
+      .catch(() => setRealSosIncidents([]))
+      .finally(() => setLoadingIncidents(false));
+  }, []);
 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>History</Text>
-        <Text style={styles.headerSub}>Every journey, alert and report — kept only on your account.</Text>
+        <Text style={styles.headerSub}>Every journey, alert and report ΓÇö kept only on your account.</Text>
       </View>
 
       {state !== "empty" ? (
@@ -94,14 +121,46 @@ export function HistoryScreen({
           />
         ) : (
           <View style={styles.listSection}>
+            {/* Real SOS incidents from orchestrator */}
+            {!loadingIncidents && realSosIncidents.length > 0 && (
+              <>
+                <Text style={styles.monthHeader}>SOS INCIDENTS</Text>
+                {realSosIncidents.map((inc) => {
+                  const st = STATUS[inc.status as keyof typeof STATUS] ?? STATUS.cancelled;
+                  const locText = inc.location
+                    ? `${inc.location.lat.toFixed(4)}, ${inc.location.lon.toFixed(4)}`
+                    : "Location unavailable";
+                  const triggerLabel =
+                    inc.source === "SHAKE" ? "Shake trigger" : "Button trigger";
+                  return (
+                    <Pressable key={inc.id} onPress={onOpen} style={styles.incidentCard}>
+                      <View style={[styles.incidentIconWrap, styles.iconWrapSos]}>
+                        <Siren size={20} color={colors.emergency} />
+                      </View>
+                      <View style={styles.incidentTextWrap}>
+                        <View style={styles.incidentTopRow}>
+                          <Text style={styles.incidentTitle}>SOS ΓÇö {triggerLabel}</Text>
+                          <Text style={styles.incidentDate}>{formatDate(inc.startTime)}</Text>
+                        </View>
+                        <Text style={styles.incidentPlace}>{locText}</Text>
+                        <Text style={styles.incidentTime}>{formatTime(inc.startTime)}</Text>
+                      </View>
+                      <Badge tone={st.tone as any}>{st.label}</Badge>
+                    </Pressable>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Static mock entries for journeys/reports */}
             <Text style={styles.monthHeader}>JUNE 2026</Text>
-            {INCIDENTS.map((it) => {
-              const Icon = it.kind === "sos" ? Siren : it.kind === "journey" ? RouteIcon : Flag;
-              const st = STATUS[it.status];
+            {MOCK_INCIDENTS.map((it) => {
+              const Icon = it.kind === "journey" ? RouteIcon : Flag;
+              const st = STATUS[it.status as keyof typeof STATUS] ?? STATUS.cancelled;
               return (
                 <Pressable key={it.id} onPress={onOpen} style={styles.incidentCard}>
-                  <View style={[styles.incidentIconWrap, it.kind === "sos" && styles.iconWrapSos]}>
-                    <Icon size={20} color={it.kind === "sos" ? colors.emergency : colors.primary} />
+                  <View style={[styles.incidentIconWrap]}>
+                    <Icon size={20} color={colors.primary} />
                   </View>
                   <View style={styles.incidentTextWrap}>
                     <View style={styles.incidentTopRow}>
@@ -109,10 +168,8 @@ export function HistoryScreen({
                       <Text style={styles.incidentDate}>{it.date}</Text>
                     </View>
                     <Text style={styles.incidentPlace}>{it.place}</Text>
-                    <View style={styles.badgeWrap}>
-                      <Badge tone={st.tone}>{st.label}</Badge>
-                    </View>
                   </View>
+                  <Badge tone={st.tone as any}>{st.label}</Badge>
                 </Pressable>
               );
             })}
@@ -145,9 +202,9 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
           </View>
           <View style={styles.detailHeaderTextWrap}>
             <Text style={styles.detailHeaderTitle}>SOS triggered</Text>
-            <Text style={styles.detailHeaderSub}>12 Jun 2026 · 9:42 PM · 100 Ft Road underpass</Text>
+            <Text style={styles.detailHeaderSub}>12 Jun 2026 ┬╖ 9:42 PM ┬╖ 100 Ft Road underpass</Text>
             <View style={styles.badgeWrap}>
-              <Badge tone="success">Resolved · you marked yourself safe</Badge>
+              <Badge tone="success">Resolved ┬╖ you marked yourself safe</Badge>
             </View>
           </View>
         </View>
@@ -172,22 +229,22 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
             <Sparkles size={17} color={colors.primary} />
             <Text style={styles.aiTitle}>What Aegis noticed</Text>
           </View>
-          <Text style={styles.aiBullet}>• Stopped moving for 4 minutes in a normally walked stretch.</Text>
-          <Text style={styles.aiBullet}>• Route deviated 180 m from the planned path.</Text>
-          <Text style={styles.aiBullet}>• Similar reports here peak between 9 PM and 11 PM.</Text>
+          <Text style={styles.aiBullet}>ΓÇó Stopped moving for 4 minutes in a normally walked stretch.</Text>
+          <Text style={styles.aiBullet}>ΓÇó Route deviated 180 m from the planned path.</Text>
+          <Text style={styles.aiBullet}>ΓÇó Similar reports here peak between 9 PM and 11 PM.</Text>
         </Card>
 
         {/* Timeline */}
         <Text style={styles.sectionHeading}>TIMELINE</Text>
         <Card style={styles.sectionCard}>
-          {INCIDENT_TIMELINE.map((s, i) => (
+          {MOCK_INCIDENT_TIMELINE.map((s, i) => (
             <TimelineItem
               key={s.id}
               time={s.time}
               title={s.title}
               detail={s.detail}
               tone={s.tone}
-              last={i === INCIDENT_TIMELINE.length - 1}
+              last={i === MOCK_INCIDENT_TIMELINE.length - 1}
             />
           ))}
         </Card>
@@ -199,8 +256,8 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
             <Mic size={20} color={colors.primary} />
           </View>
           <View style={styles.evidenceTextWrap}>
-            <Text style={styles.evidenceTitle}>Audio · 8 min 42 s</Text>
-            <Text style={styles.evidenceSub}>Encrypted · stored on your device only</Text>
+            <Text style={styles.evidenceTitle}>Audio ┬╖ 8 min 42 s</Text>
+            <Text style={styles.evidenceSub}>Encrypted ┬╖ stored on your device only</Text>
           </View>
         </Card>
       </ScrollView>
@@ -255,6 +312,7 @@ const styles = StyleSheet.create({
   incidentTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   incidentDate: { fontSize: 12, color: colors.mutedForeground },
   incidentPlace: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
+  incidentTime: { fontSize: 11, color: colors.mutedForeground, marginTop: 1 },
   badgeWrap: { marginTop: 8, alignSelf: "flex-start" },
   downloadIconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   detailHeaderRow: { flexDirection: "row", gap: 14, marginVertical: 12 },

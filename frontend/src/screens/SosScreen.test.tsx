@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
+﻿import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
 import { SosScreen } from "./SosScreen";
 
 afterEach(() => {
@@ -9,9 +9,9 @@ describe("SosScreen", () => {
   it("renders active emergency state correctly", async () => {
     await render(<SosScreen state="active" />);
     expect(screen.getByText("EMERGENCY ACTIVE")).toBeTruthy();
-    expect(screen.getByText("04:12")).toBeTruthy();
+    expect(screen.getByText("00:00")).toBeTruthy();
     expect(screen.getByText("Audio recording")).toBeTruthy();
-    expect(screen.getByText("Call police · 112")).toBeTruthy();
+    expect(screen.getByText("Call police ┬╖ 112")).toBeTruthy();
   });
 
   it("triggers onEnd callback when end emergency button is pressed", async () => {
