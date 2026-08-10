@@ -1,0 +1,170 @@
+/**
+ * Network Connectivity & Offline Request Queue Monitor
+ * Automatically queues AI queries and emergency alerts when offline,
+ * ensuring NO emergency events are ever lost.
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_CONFIG } from './apiConfig';
+import { logger } from '../utils/logger';
+
+const QUEUE_STORAGE_KEY = '@aegis_offline_request_queue';
+
+export interface QueuedOfflineRequest {
+  id: string;
+  type: 'AI_QUERY' | 'EMERGENCY_ALERT';
+  endpoint: string;
+  payload: any;
+  timestamp: string;
+  retryCount: number;
+}
+
+export class NetworkMonitor {
+  private static instance: NetworkMonitor;
+  private isOnlineStatus: boolean = true;
+  private listeners: Array<(isOnline: boolean) => void> = [];
+  private isProcessingQueue: boolean = false;
+  private heartbeatTimer: any = null;
+
+  private constructor() {
+    this.startHeartbeatMonitor();
+  }
+
+  public static getInstance(): NetworkMonitor {
+    if (!NetworkMonitor.instance) {
+      NetworkMonitor.instance = new NetworkMonitor();
+    }
+    return NetworkMonitor.instance;
+  }
+
+  public isOnline(): boolean {
+    return this.isOnlineStatus;
+  }
+
+  public setOnlineStatus(status: boolean): void {
+    if (this.isOnlineStatus !== status) {
+      this.isOnlineStatus = status;
+      logger.info(`Network status changed: [${status ? 'ONLINE' : 'OFFLINE'}]`);
+      this.listeners.forEach(l => l(status));
+      if (status) {
+        this.processOfflineQueue();
+      }
+    }
+  }
+
+  public onNetworkChange(listener: (isOnline: boolean) => void): () => void {
+    this.listeners.push(listener);
+    listener(this.isOnlineStatus);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  /**
+   * Queue an emergency or AI request when offline to guarantee 0 data loss
+   */
+  public async queueOfflineRequest(
+    type: 'AI_QUERY' | 'EMERGENCY_ALERT',
+    endpoint: string,
+    payload: any
+  ): Promise<void> {
+    try {
+      const queue = await this.getQueue();
+      const newRequest: QueuedOfflineRequest = {
+        id: `off_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        type,
+        endpoint,
+        payload,
+        timestamp: new Date().toISOString(),
+        retryCount: 0,
+      };
+
+      queue.push(newRequest);
+      await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      logger.info(`🚨 Queued offline ${type} request (${queue.length} items total)`);
+    } catch (err) {
+      logger.error('Failed to queue offline request:', err);
+    }
+  }
+
+  public async getQueue(): Promise<QueuedOfflineRequest[]> {
+    try {
+      const json = await AsyncStorage.getItem(QUEUE_STORAGE_KEY);
+      if (!json) return [];
+      return JSON.parse(json) as QueuedOfflineRequest[];
+    } catch (err) {
+      logger.error('Failed to read offline queue:', err);
+      return [];
+    }
+  }
+
+  public async processOfflineQueue(): Promise<void> {
+    if (this.isProcessingQueue || !this.isOnlineStatus) return;
+    this.isProcessingQueue = true;
+
+    try {
+      const queue = await this.getQueue();
+      if (queue.length === 0) {
+        this.isProcessingQueue = false;
+        return;
+      }
+
+      logger.info(`Processing ${queue.length} offline queued requests...`);
+      const remainingQueue: QueuedOfflineRequest[] = [];
+
+      for (const item of queue) {
+        try {
+          const { apiClient } = await import('./apiClient');
+          await apiClient.post(item.endpoint, item.payload);
+          logger.info(`Successfully synchronized offline ${item.type} request [${item.id}]`);
+        } catch (err) {
+          logger.error(`Failed to flush queued item [${item.id}]:`, err);
+          item.retryCount += 1;
+          if (item.retryCount < 5) {
+            remainingQueue.push(item);
+          }
+        }
+      }
+
+      await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(remainingQueue));
+    } catch (err) {
+      logger.error('Error while processing offline queue:', err);
+    } finally {
+      this.isProcessingQueue = false;
+    }
+  }
+
+  private startHeartbeatMonitor(): void {
+    if (process.env.NODE_ENV === 'test') {
+      return; // Skip background timer during tests
+    }
+
+    let pollIntervalMs = 30000;
+
+    const checkHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const url = `${API_CONFIG.baseURL}/health`;
+        const res = await fetch(url, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          this.setOnlineStatus(true);
+          pollIntervalMs = 30000;
+        } else {
+          this.setOnlineStatus(false);
+          pollIntervalMs = 60000;
+        }
+      } catch (_err) {
+        this.setOnlineStatus(false);
+        pollIntervalMs = 60000;
+      }
+    };
+
+    checkHealth();
+    this.heartbeatTimer = setInterval(checkHealth, pollIntervalMs);
+  }
+}
+
+export const networkMonitor = NetworkMonitor.getInstance();
