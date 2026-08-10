@@ -13,7 +13,9 @@ export function AppInput({
   invalid,
   hint,
   keyboardType,
+  autoCapitalize,
   autoComplete,
+  secureTextEntry,
   maxLength,
   editable = true,
 }: {
@@ -23,7 +25,9 @@ export function AppInput({
   invalid?: boolean;
   hint?: string;
   keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: ComponentProps<typeof TextInput>["autoCapitalize"];
   autoComplete?: ComponentProps<typeof TextInput>["autoComplete"];
+  secureTextEntry?: boolean;
   maxLength?: number;
   editable?: boolean;
 }) {
@@ -48,7 +52,9 @@ export function AppInput({
           placeholder={placeholder}
           placeholderTextColor={`${colors.mutedForeground}b3`}
           keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
           autoComplete={autoComplete}
+          secureTextEntry={secureTextEntry}
           maxLength={maxLength}
           editable={editable}
           onFocus={() => setFocused(true)}

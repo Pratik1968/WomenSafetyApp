@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "WomenSafty",
-    "slug": "womensafty",
+    "name": "Aegis",
+    "slug": "aegis-women-safety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -17,13 +17,32 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#090A0F",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/splash-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.womensafty.app"
+      "package": "com.nameisrk.aegiswomensafety",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      "expo-notifications"
+    ]
   }
 }
