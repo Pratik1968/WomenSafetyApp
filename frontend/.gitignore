@@ -29,9 +29,14 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+*.expo-env.d.ts
 
 # local env files
 .env*.local
+# project env files (contain secrets — never commit)
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
