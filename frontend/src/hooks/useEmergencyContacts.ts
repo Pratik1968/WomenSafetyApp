@@ -19,7 +19,6 @@ export const RELATIONSHIP_OPTIONS = [
   "FRIEND",
   "OTHER",
 ] as const;
-
 export type RelationshipOption = (typeof RELATIONSHIP_OPTIONS)[number];
 
 export function normalizeRelationship(value?: string | null, fallback: RelationshipOption = "OTHER"): RelationshipOption {
@@ -30,6 +29,7 @@ export function normalizeRelationship(value?: string | null, fallback: Relations
     ? (normalized as RelationshipOption)
     : fallback;
 }
+
 
 export function formatContact(raw: any, relation: string = "OTHER"): PhoneContact {
   const name = raw.name || [raw.firstName, raw.lastName].filter(Boolean).join(" ") || "Contact";
@@ -336,3 +336,4 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
     isMaxReached: contacts.length >= 5,
   };
 }
+

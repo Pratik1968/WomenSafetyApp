@@ -563,3 +563,4 @@ const styles = StyleSheet.create({
   footerNote: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 },
   footerNoteText: { fontSize: 12, color: colors.mutedForeground },
 });
+

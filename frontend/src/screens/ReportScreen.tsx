@@ -337,3 +337,4 @@ const styles = StyleSheet.create({
   successLink: { alignItems: "center", paddingVertical: 4 },
   successLinkText: { fontSize: 14, fontWeight: "600", color: colors.primary },
 });
+

@@ -363,7 +363,7 @@ function HistoryRouteScreen({ navigation }: P<"History">) {
         else if (t === "safety") navigation.navigate("Safety");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onOpen={() => navigation.navigate("IncidentDetail")}
+      onOpen={(incidentId?: string) => navigation.navigate("IncidentDetail", { incidentId })}
       onAssistant={() => navigation.navigate("Assistant")}
       onSos={() => navigation.navigate("Sos", { state: "active" })}
     />
@@ -562,3 +562,4 @@ function MobileApp() {
 export function RootStack() {
   return Platform.OS === "web" ? <WebAdminApp /> : <MobileApp />;
 }
+

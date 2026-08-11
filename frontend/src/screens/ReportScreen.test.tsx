@@ -94,3 +94,4 @@ describe("ReportScreen", () => {
     expect(screen.getByText("Submit report")).toBeTruthy();
   });
 });
+
