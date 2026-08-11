@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis_backend_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - FIREBASE_PROJECT_ID=women-safety-3d446
+      - FIREBASE_SERVICE_ACCOUNT_PATH=credentials/firebase-service-account.json
+      - DATABASE_URL=sqlite:///./women_safety.db
+    volumes:
+      - .:/app
