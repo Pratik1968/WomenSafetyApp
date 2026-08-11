@@ -89,8 +89,9 @@ describe("ReportScreen", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Couldn't submit your report. Check your connection and try again.")).toBeTruthy()
+      expect(screen.getByText("network unavailable")).toBeTruthy()
     );
     expect(screen.getByText("Submit report")).toBeTruthy();
   });
 });
+

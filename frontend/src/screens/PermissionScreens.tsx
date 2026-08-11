@@ -112,12 +112,20 @@ export const JUST_IN_TIME_PERMISSIONS: Record<string, PermissionSpec> = {
     systemBody: "Allow Aegis to detect motion & activity?",
     deniedBody: "Safety Mode will not be able to auto-detect falls.",
   },
+  bluetooth: {
+    key: "bluetooth",
+    icon: Bluetooth,
+    title: "Bluetooth Devices",
+    reason: "To connect smartwatches or panic buttons.",
+    detail: "Scans for nearby wearable panic buttons or smartwatches.",
+    systemBody: "Allow Aegis to access Bluetooth?",
+    deniedBody: "Unable to connect wearable hardware panic buttons.",
+  },
 };
 
 async function fetchAndRegisterPushToken(): Promise<void> {
   try {
     if (Platform.OS === "android" && typeof Notifications?.setNotificationChannelAsync === "function") {
-      // Required on Android 13+ before a device push token can be issued.
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
         importance: Notifications.AndroidImportance.MAX,
@@ -292,3 +300,4 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 15, lineHeight: 24, color: colors.mutedForeground },
   footer: { gap: 8, paddingHorizontal: 32, paddingBottom: 8 },
 });
+

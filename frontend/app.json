@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "WomenSafty",
-    "slug": "womensafty",
+    "name": "Aegis",
+    "slug": "aegis-women-safety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -26,7 +26,7 @@
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#090A0F",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/splash-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nameisrk.aegiswomensafety",
@@ -66,6 +66,7 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow WomenSafty to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident.",
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
@@ -94,3 +95,4 @@
     ]
   }
 }
+

@@ -26,6 +26,8 @@ import {
   PhoneCall,
   HeartHandshake,
 } from "lucide-react-native";
+import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
 import { colors, gradientBrand, radii } from "../theme/tokens";
 import { Card } from "../components/ds/Card";
 import { SectionHeader } from "../components/ds/SectionHeader";
@@ -190,7 +192,17 @@ export function HomeScreen({
     };
   }, [showCountdown]);
 
-  const handleSosTrigger = useCallback(() => {
+  const handleSosTrigger = useCallback(async () => {
+    try {
+      if (typeof Location?.requestForegroundPermissionsAsync === "function") {
+        await Location.requestForegroundPermissionsAsync();
+      }
+      if (typeof Notifications?.requestPermissionsAsync === "function") {
+        await Notifications.requestPermissionsAsync();
+      }
+    } catch (err) {
+      console.warn("Native SOS permission request error:", err);
+    }
     showCountdown("BUTTON");
   }, [showCountdown]);
 
@@ -551,3 +563,4 @@ const styles = StyleSheet.create({
   footerNote: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 },
   footerNoteText: { fontSize: 12, color: colors.mutedForeground },
 });
+

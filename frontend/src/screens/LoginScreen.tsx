@@ -186,3 +186,4 @@ const styles = StyleSheet.create({
   otpLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 8 },
   otpLinkText: { fontSize: 14, fontWeight: "500", color: colors.mutedForeground, textDecorationLine: "underline" },
 });
+

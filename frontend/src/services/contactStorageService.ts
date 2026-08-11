@@ -3,3 +3,4 @@
  */
 
 export * from '../modules/emergency/services/contactStorageService';
+

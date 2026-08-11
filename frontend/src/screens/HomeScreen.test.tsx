@@ -48,3 +48,4 @@ describe("HomeScreen", () => {
     expect(onQuickAction).toHaveBeenCalledWith("Safe Route");
   });
 });
+

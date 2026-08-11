@@ -1,6 +1,18 @@
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
 import { SosScreen } from "./SosScreen";
 
+jest.mock("../services/sosOrchestratorService", () => ({
+  triggerSOS: jest.fn(() => Promise.resolve("inc-1")),
+  cancelSOS: jest.fn(() => Promise.resolve()),
+  getActiveIncidentId: jest.fn(() => null),
+}));
+
+jest.mock("../services/contactStorageService", () => ({
+  contactStorageService: {
+    getStoredEmergencyContacts: jest.fn(() => Promise.resolve([])),
+  },
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -45,3 +57,4 @@ describe("SosScreen", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 });
+

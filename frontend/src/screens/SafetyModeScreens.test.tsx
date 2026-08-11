@@ -57,3 +57,4 @@ describe("SafetyModeScreens", () => {
     expect(screen.getByText("8.4 km")).toBeTruthy();
   });
 });
+

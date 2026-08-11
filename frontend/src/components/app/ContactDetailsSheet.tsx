@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { BottomSheet } from "../ds/BottomSheet";
 import { SelectRow } from "../ds/SelectRow";
 import { AppButton } from "../ds/AppButton";
 import { FieldLabel } from "../ds/Field";
-import { RELATIONSHIP_OPTIONS } from "../../hooks/useEmergencyContacts";
+import { RELATIONSHIP_OPTIONS, normalizeRelationship } from "../../hooks/useEmergencyContacts";
 import type { PhoneContact } from "../../data/mock";
 import { colors } from "../../theme/tokens";
 
@@ -55,14 +55,25 @@ export function ContactDetailsSheet({
   onSave: (relation: string, priority: number) => void;
 }) {
   const [relation, setRelation] = useState("FRIEND");
+  const relationRef = useRef("FRIEND");
   const [priority, setPriority] = useState(1);
+
+  const selectRelation = (nextRelation: string) => {
+    const normalized = normalizeRelationship(nextRelation, "FRIEND");
+    relationRef.current = normalized;
+    setRelation(normalized);
+  };
 
   useEffect(() => {
     if (!open || !contact) return;
-    const normalized = (contact.relation || "FRIEND").toUpperCase();
-    setRelation(mode === "add" && normalized === "OTHER" ? "FRIEND" : normalized);
+    const normalized = normalizeRelationship(contact.relation, "FRIEND");
+    selectRelation(mode === "add" && normalized === "OTHER" ? "FRIEND" : normalized);
+  }, [open, contact?.id, contact?.relation, mode]);
+
+  useEffect(() => {
+    if (!open || !contact) return;
     setPriority(contact.priority ?? nextAvailablePriority(existingContacts));
-  }, [open, contact, existingContacts, mode]);
+  }, [open, contact?.id, contact?.priority, existingContacts]);
 
   const priorityOptions = useMemo(() => {
     return [1, 2, 3, 4, 5].map((value) => {
@@ -96,7 +107,7 @@ export function ContactDetailsSheet({
             key={option}
             label={formatRelationLabel(option)}
             selected={relation === option}
-            onPress={() => setRelation(option)}
+            onPress={() => selectRelation(option)}
           />
         ))}
       </View>
@@ -115,7 +126,7 @@ export function ContactDetailsSheet({
       </View>
 
       <View style={styles.actions}>
-        <AppButton onPress={() => onSave(relation, priority)}>
+        <AppButton onPress={() => onSave(normalizeRelationship(relationRef.current, "FRIEND"), priority)}>
           {mode === "add" ? "Add contact" : "Save changes"}
         </AppButton>
         <AppButton variant="ghost" size="md" onPress={onClose}>
@@ -150,3 +161,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+

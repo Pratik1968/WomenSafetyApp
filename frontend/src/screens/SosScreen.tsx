@@ -19,6 +19,9 @@ import {
   MapPin,
   HeartHandshake,
 } from "lucide-react-native";
+import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
+import { Camera } from "expo-camera";
 import { colors, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
 import { Card } from "../components/ds/Card";
@@ -33,15 +36,7 @@ import {
 } from "../services/sosOrchestratorService";
 import { contactStorageService } from "../services/contactStorageService";
 
-// ──────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────
-
 export type SosState = "active" | "confirm" | "cancelled";
-
-// ──────────────────────────────────────────────────────────────
-// LiveRow sub-component
-// ──────────────────────────────────────────────────────────────
 
 function LiveRow({
   icon: Icon,
@@ -79,19 +74,11 @@ function LiveRow({
   );
 }
 
-// ──────────────────────────────────────────────────────────────
-// Utility: format elapsed seconds as MM:SS
-// ──────────────────────────────────────────────────────────────
-
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
   const s = (seconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
-
-// ──────────────────────────────────────────────────────────────
-// Main SosScreen
-// ──────────────────────────────────────────────────────────────
 
 export function SosScreen({
   state = "active",
@@ -102,31 +89,20 @@ export function SosScreen({
   onDeleteRecordings,
 }: {
   state?: SosState;
-  /** What triggered this SOS — used by the orchestrator */
   triggerSource?: SOSTriggerSource;
   onEnd?: () => void;
   onCancelConfirm?: () => void;
   onDone?: () => void;
   onDeleteRecordings?: () => void;
 }) {
-  // ── Location label ─────────────────────────────────────────
   const [mapLabel, setMapLabel] = useState<string | null>(null);
-
-  // ── Elapsed timer ──────────────────────────────────────────
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedRef = useRef(0); // non-React ref for closure safety
-
-  // ── Incident duration for "cancelled" summary ──────────────
+  const elapsedRef = useRef(0);
   const [finalDuration, setFinalDuration] = useState<string | null>(null);
-
-  // ── Real contact names ─────────────────────────────────────
   const [contactNames, setContactNames] = useState<string>("Loading…");
-
-  // ── SOS pipeline state ─────────────────────────────────────
   const incidentIdRef = useRef<string | null>(null);
 
-  // ── Load contacts on mount ─────────────────────────────────
   useEffect(() => {
     contactStorageService.getStoredEmergencyContacts().then((contacts) => {
       if (contacts.length === 0) {
@@ -140,9 +116,8 @@ export function SosScreen({
     });
   }, []);
 
-  // ── Elapsed timer ──────────────────────────────────────────
   const startTimer = useCallback(() => {
-    if (timerRef.current) return; // already running
+    if (timerRef.current) return;
     timerRef.current = setInterval(() => {
       elapsedRef.current += 1;
       setElapsedSecs(elapsedRef.current);
@@ -156,9 +131,27 @@ export function SosScreen({
     }
   }, []);
 
-  // ── Main SOS pipeline (fires when state becomes 'active') ──
   useEffect(() => {
     if (state !== "active") return;
+
+    (async () => {
+      try {
+        if (typeof Location?.requestForegroundPermissionsAsync === "function") {
+          await Location.requestForegroundPermissionsAsync();
+        }
+        if (typeof Notifications?.requestPermissionsAsync === "function") {
+          await Notifications.requestPermissionsAsync();
+        }
+        if (typeof Camera?.requestCameraPermissionsAsync === "function") {
+          await Camera.requestCameraPermissionsAsync();
+        }
+        if (typeof Camera?.requestMicrophonePermissionsAsync === "function") {
+          await Camera.requestMicrophonePermissionsAsync();
+        }
+      } catch (err) {
+        console.warn("SOS mode permission trigger error:", err);
+      }
+    })();
 
     elapsedRef.current = 0;
     setElapsedSecs(0);
@@ -182,16 +175,13 @@ export function SosScreen({
       mounted = false;
       stopTimer();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [state, triggerSource, startTimer, stopTimer]);
 
-  // ── When state changes to cancelled — stop timer, resolve SOS ─
   useEffect(() => {
     if (state === "cancelled") {
       setFinalDuration(formatElapsed(elapsedRef.current));
       stopTimer();
 
-      // Cancel the SOS incident in the orchestrator
       const id = incidentIdRef.current ?? getActiveIncidentId();
       if (id) {
         cancelSOS(id, "resolved").catch(console.warn);
@@ -199,7 +189,6 @@ export function SosScreen({
     }
   }, [state, stopTimer]);
 
-  // ── Cancelled / "safe" screen ──────────────────────────────
   if (state === "cancelled") {
     return (
       <View style={styles.cancelledScreen}>
@@ -229,21 +218,17 @@ export function SosScreen({
     );
   }
 
-  // ── Active / confirm screen ────────────────────────────────
   return (
     <View style={styles.activeScreen}>
       <View style={styles.activeContent}>
-        {/* Header badge */}
         <View style={styles.headerBadge}>
           <Waves size={14} color={colors.emergencyForeground} />
           <Text style={styles.headerBadgeText}>EMERGENCY ACTIVE</Text>
         </View>
 
-        {/* Live elapsed timer */}
         <Text style={styles.timerText}>{formatElapsed(elapsedSecs)}</Text>
         <Text style={styles.timerSub}>Help is being coordinated. Stay with us.</Text>
 
-        {/* Location pill */}
         <View style={styles.mapStub}>
           <MapPin size={16} color={colors.emergency} />
           <Text style={styles.mapStubText} numberOfLines={1}>
@@ -251,7 +236,6 @@ export function SosScreen({
           </Text>
         </View>
 
-        {/* Live status rows */}
         <ScrollView
           style={styles.rowsContainer}
           showsVerticalScrollIndicator={false}
@@ -283,7 +267,6 @@ export function SosScreen({
           </View>
         </ScrollView>
 
-        {/* Footer actions */}
         <View style={styles.footerActions}>
           <View style={styles.helplineButtonsRow}>
             <Pressable
@@ -305,7 +288,6 @@ export function SosScreen({
             </Pressable>
           </View>
 
-          {/* End emergency (long press) */}
           <Pressable
             onPress={onEnd}
             onLongPress={onEnd}
@@ -322,7 +304,6 @@ export function SosScreen({
         </View>
       </View>
 
-      {/* Confirm-end dialog */}
       <Dialog
         open={state === "confirm"}
         onClose={() => undefined}
@@ -342,10 +323,6 @@ export function SosScreen({
     </View>
   );
 }
-
-// ──────────────────────────────────────────────────────────────
-// Styles (unchanged from original — colours + spacing preserved)
-// ──────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   activeScreen: { flex: 1, backgroundColor: colors.emergency },
@@ -501,3 +478,4 @@ const styles = StyleSheet.create({
   cancelledFooter: { paddingHorizontal: 24, paddingBottom: 24, gap: 8 },
   dialogActions: { gap: 10, width: "100%" },
 });
+

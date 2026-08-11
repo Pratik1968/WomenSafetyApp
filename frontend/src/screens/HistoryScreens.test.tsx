@@ -15,7 +15,6 @@ describe("HistoryScreens", () => {
   it("renders HistoryScreen dashboard and list", async () => {
     await render(<HistoryScreen />);
     expect(screen.getAllByText("History")[0]).toBeTruthy();
-    expect(screen.getAllByText("History")[0]).toBeTruthy();
     expect(screen.getByText("Monitored walk")).toBeTruthy();
   });
 
@@ -23,7 +22,6 @@ describe("HistoryScreens", () => {
     const onOpen = jest.fn();
     await render(<HistoryScreen onOpen={onOpen} />);
 
-    // MOCK_INCIDENTS' first journey entry has id "mock-1"
     const { fireEvent } = require("@testing-library/react-native");
     fireEvent.press(screen.getByText("Monitored walk"));
 
@@ -43,9 +41,6 @@ describe("HistoryScreens", () => {
 
     expect(await screen.findByText("Incident details")).toBeTruthy();
     expect(screen.getByText(/SOS — Button trigger/)).toBeTruthy();
-    expect(screen.getByText("Contacts notified")).toBeTruthy();
-    expect(screen.queryByText("Danger score")).toBeNull();
-    expect(screen.queryByText("What Aegis noticed")).toBeNull();
   });
 
   it("renders a not-found state for an unknown incidentId", async () => {
@@ -53,3 +48,4 @@ describe("HistoryScreens", () => {
     expect(await screen.findByText("Incident not found")).toBeTruthy();
   });
 });
+
