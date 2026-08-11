@@ -5,6 +5,6 @@
   },
   "imports": {},
   "tasks": {
-    "check": "deno check authentication-service/index.ts user-service/index.ts emergency-service/index.ts gps-service/index.ts notification-service/index.ts ai-service/index.ts"
+    "check": "deno check authentication-service/index.ts user-service/index.ts emergency-service/index.ts gps-service/index.ts notification-service/index.ts ai-service/index.ts incident-report-service/index.ts storage/index.ts"
   }
 }

@@ -1,8 +1,25 @@
+# ---- OS / editor ----
+.DS_Store
+*.swp
+Thumbs.db
+
+# ---- Secrets / env ----
 .env
-*.env
-!*.env.example
-venv/
-.venv/
-__pycache__/
-*.pyc
+.env.*
+!.env.example
+
+# ---- Supabase (CLI generated) ----
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+supabase/logs/
+
+# ---- Node ----
 node_modules/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ---- Deno (backend) ----
+# deno.lock is committed; ignore local caches only
+.deno/
