@@ -27,6 +27,8 @@ import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { contactStorageService } from "./contactStorageService";
 import { sendSilentSms, makeSilentCall } from "./sosNativeService";
+import { auth } from "./firebaseConfig";
+import { syncIncidentEvent } from "./incidentSyncService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -160,12 +162,44 @@ async function writeIncidents(incidents: SOSIncident[]): Promise<void> {
 async function patchIncident(
   id: string,
   updater: (inc: SOSIncident) => SOSIncident
-): Promise<void> {
+): Promise<SOSIncident | undefined> {
   const incidents = await readIncidents();
   const idx = incidents.findIndex((i) => i.id === id);
-  if (idx === -1) return;
+  if (idx === -1) return undefined;
   incidents[idx] = updater(incidents[idx]);
   await writeIncidents(incidents);
+  return incidents[idx];
+}
+
+/**
+ * Fire-and-forget backend sync for one pipeline step. Callers MUST NOT
+ * `await` this — on poor connectivity the API client's timeout/retry
+ * behavior can take 10s+ per call, and this must never delay the
+ * actual SMS-sending / call-placing steps in the pipeline (see file
+ * header). Never throws internally either way — a failed sync must not
+ * block or fail the SOS pipeline. Skips silently if no user is signed in
+ * (nothing to attribute the incident to).
+ */
+async function syncStepToBackend(inc: SOSIncident, step: string, data?: Record<string, unknown>): Promise<void> {
+  const firebaseUid = auth.currentUser?.uid;
+  if (!firebaseUid) return;
+
+  try {
+    await syncIncidentEvent({
+      clientIncidentId: inc.id,
+      firebaseUid,
+      source: inc.source,
+      status: inc.status,
+      startedAt: inc.startTime,
+      endedAt: inc.endTime,
+      location: inc.location,
+      step,
+      stepData: data,
+      occurredAt: Date.now(),
+    });
+  } catch (err) {
+    console.warn(`[sosOrchestrator] Backend sync failed for step ${step}:`, err);
+  }
 }
 
 async function appendLog(
@@ -173,13 +207,18 @@ async function appendLog(
   step: string,
   data?: Record<string, unknown>
 ): Promise<void> {
-  await patchIncident(incidentId, (inc) => ({
+  const updated = await patchIncident(incidentId, (inc) => ({
     ...inc,
     timeline: [
       ...inc.timeline,
       { step, timestamp: Date.now(), data },
     ],
   }));
+  if (updated) {
+    // Fire-and-forget: do not await — a slow/hanging network call must
+    // never delay the SOS pipeline (see syncStepToBackend's doc comment).
+    void syncStepToBackend(updated, step, data);
+  }
 }
 
 async function ensureAndroidPermissions(): Promise<void> {
@@ -259,6 +298,14 @@ export async function getIncidents(): Promise<SOSIncident[]> {
 }
 
 /**
+ * Returns a single stored SOS incident by id, or undefined if not found.
+ */
+export async function getIncidentById(id: string): Promise<SOSIncident | undefined> {
+  const incidents = await readIncidents();
+  return incidents.find((i) => i.id === id);
+}
+
+/**
  * Main SOS trigger — runs the full emergency pipeline.
  *
  * @param source - 'BUTTON' (user pressed the SOS button) or 'SHAKE' (shake trigger)
@@ -287,6 +334,9 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   const incidents = await readIncidents();
   incidents.unshift(incident);
   await writeIncidents(incidents);
+  // Fire-and-forget: do not await — a slow/hanging network call must
+  // never delay the SOS pipeline (see syncStepToBackend's doc comment).
+  void syncStepToBackend(incident, "SOS_TRIGGERED", { source });
 
   // ── Step 2: Get location (with fallback) ────────────────────
   const location = await acquireLocation();

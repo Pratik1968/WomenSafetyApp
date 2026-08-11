@@ -7,9 +7,6 @@ import {
   AlertTriangle,
   Search,
   Download,
-  Sparkles,
-  Mic,
-  Video,
 } from "lucide-react-native";
 import { colors, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
@@ -18,25 +15,22 @@ import { Card } from "../components/ds/Card";
 import { Chip } from "../components/ds/Chip";
 import { EmptyState } from "../components/ds/EmptyState";
 import { NavBar } from "../components/ds/NavBar";
-import { TimelineItem } from "../components/ds/TimelineItem";
+import { TimelineItem, type TimelineTone } from "../components/ds/TimelineItem";
 import { BottomNav, type TabKey } from "../components/app/BottomNav";
 import {
   getIncidents,
+  getIncidentById,
   type SOSIncident,
+  type SOSLogEntry,
 } from "../services/sosOrchestratorService";
+import { fetchIncidentHistory } from "../services/incidentSyncService";
+import { auth } from "../services/firebaseConfig";
 
 // Static mock data for non-SOS entries (journeys, reports) — will be replaced
 // when those features integrate with the orchestrator.
 const MOCK_INCIDENTS = [
   { id: "mock-1", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
   { id: "mock-2", kind: "report" as const, title: "Area report", place: "5th Cross stretch", date: "04 Jun", status: "under-review" as const },
-];
-
-const MOCK_INCIDENT_TIMELINE = [
-  { id: "s1", time: "9:42 PM", title: "SOS button held", detail: "Pressed for 3 seconds on 100 Ft Road.", tone: "emergency" as const },
-  { id: "s2", time: "9:42 PM", title: "Contacts notified", detail: "Amma, Meera & Nanna received SMS and call alert.", tone: "brand" as const },
-  { id: "s3", time: "9:43 PM", title: "Audio & video started", detail: "Continuous encrypted background recording.", tone: "brand" as const },
-  { id: "s4", time: "9:46 PM", title: "Marked safe", detail: "You ended the emergency.", tone: "success" as const },
 ];
 
 const STATUS = {
@@ -71,7 +65,7 @@ export function HistoryScreen({
 }: {
   state?: HistoryState;
   onTab?: (t: TabKey) => void;
-  onOpen?: () => void;
+  onOpen?: (incidentId: string) => void;
   onAssistant?: () => void;
   onSos?: () => void;
 }) {
@@ -79,12 +73,40 @@ export function HistoryScreen({
   const [realSosIncidents, setRealSosIncidents] = useState<SOSIncident[]>([]);
   const [loadingIncidents, setLoadingIncidents] = useState(true);
 
-  // Load real SOS incidents from AsyncStorage on mount
+  // Load real SOS incidents from AsyncStorage on mount, then reconcile with
+  // the backend in the background (covers reinstall/multi-device — local
+  // storage remains the primary, immediately-available source of truth).
   useEffect(() => {
     getIncidents()
       .then(setRealSosIncidents)
       .catch(() => setRealSosIncidents([]))
       .finally(() => setLoadingIncidents(false));
+
+    const firebaseUid = auth.currentUser?.uid;
+    if (!firebaseUid) return;
+
+    fetchIncidentHistory(firebaseUid).then((remoteIncidents) => {
+      if (remoteIncidents.length === 0) return;
+      setRealSosIncidents((current) => {
+        const localIds = new Set(current.map((i) => i.id));
+        const missingFromLocal = remoteIncidents.filter((r) => !localIds.has(r.clientIncidentId));
+        if (missingFromLocal.length === 0) return current;
+        const merged: SOSIncident[] = missingFromLocal.map((r) => ({
+          id: r.clientIncidentId,
+          source: (r.source as SOSIncident["source"]) ?? "BUTTON",
+          startTime: new Date(r.startedAt).getTime(),
+          endTime: r.endedAt ? new Date(r.endedAt).getTime() : undefined,
+          status: (r.status as SOSIncident["status"]) ?? "resolved",
+          location:
+            r.latitude != null && r.longitude != null
+              ? { lat: r.latitude, lon: r.longitude, timestamp: new Date(r.startedAt).getTime(), accurate: true }
+              : null,
+          contactsNotified: [],
+          timeline: [],
+        }));
+        return [...current, ...merged].sort((a, b) => b.startTime - a.startTime);
+      });
+    });
   }, []);
 
   return (
@@ -133,7 +155,7 @@ export function HistoryScreen({
                   const triggerLabel =
                     inc.source === "SHAKE" ? "Shake trigger" : "Button trigger";
                   return (
-                    <Pressable key={inc.id} onPress={onOpen} style={styles.incidentCard}>
+                    <Pressable key={inc.id} onPress={() => onOpen?.(inc.id)} style={styles.incidentCard}>
                       <View style={[styles.incidentIconWrap, styles.iconWrapSos]}>
                         <Siren size={20} color={colors.emergency} />
                       </View>
@@ -158,7 +180,7 @@ export function HistoryScreen({
               const Icon = it.kind === "journey" ? RouteIcon : Flag;
               const st = STATUS[it.status as keyof typeof STATUS] ?? STATUS.cancelled;
               return (
-                <Pressable key={it.id} onPress={onOpen} style={styles.incidentCard}>
+                <Pressable key={it.id} onPress={() => onOpen?.(it.id)} style={styles.incidentCard}>
                   <View style={[styles.incidentIconWrap]}>
                     <Icon size={20} color={colors.primary} />
                   </View>
@@ -182,7 +204,79 @@ export function HistoryScreen({
   );
 }
 
-export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
+const STEP_LABELS: Record<string, { title: string; tone: TimelineTone }> = {
+  SOS_TRIGGERED: { title: "SOS triggered", tone: "emergency" },
+  LOCATION_ACQUIRED: { title: "Location acquired", tone: "brand" },
+  SMS_SENT: { title: "Contacts notified", tone: "brand" },
+  SMS_SKIPPED: { title: "No contacts configured", tone: "warning" },
+  CALL_PLACED: { title: "Call placed to primary contact", tone: "brand" },
+  LIVE_TRACKING_STARTED: { title: "Live location tracking started", tone: "brand" },
+  LIVE_TRACKING_FAILED: { title: "Live location tracking failed", tone: "warning" },
+  LOCATION_UPDATE: { title: "Location updated", tone: "brand" },
+  SOS_ENDED: { title: "Emergency ended", tone: "success" },
+};
+
+function describeTimelineStep(entry: SOSLogEntry): { time: string; title: string; detail?: string; tone: TimelineTone } {
+  const label = STEP_LABELS[entry.step] ?? { title: entry.step, tone: "brand" as const };
+  let detail: string | undefined;
+  if (entry.step === "SMS_SENT" && Array.isArray(entry.data?.numbers)) {
+    detail = `Sent to ${(entry.data!.numbers as string[]).length} contact(s).`;
+  } else if (entry.step === "LOCATION_ACQUIRED" || entry.step === "LOCATION_UPDATE") {
+    const lat = entry.data?.lat;
+    const lon = entry.data?.lon;
+    if (typeof lat === "number" && typeof lon === "number") {
+      detail = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    }
+  } else if (entry.step === "SOS_ENDED" && typeof entry.data?.status === "string") {
+    detail = `Marked as ${entry.data.status}.`;
+  }
+  return { time: formatTime(entry.timestamp), title: label.title, detail, tone: label.tone };
+}
+
+export function IncidentDetailScreen({
+  incidentId,
+  onBack,
+}: {
+  incidentId?: string;
+  onBack?: () => void;
+}) {
+  const [incident, setIncident] = useState<SOSIncident | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!incidentId) {
+      setIncident(null);
+      return;
+    }
+    getIncidentById(incidentId)
+      .then((found) => setIncident(found ?? null))
+      .catch(() => setIncident(null));
+  }, [incidentId]);
+
+  if (incident === undefined) {
+    return (
+      <View style={styles.screen}>
+        <NavBar title="Incident details" onBack={onBack} />
+      </View>
+    );
+  }
+
+  if (incident === null) {
+    return (
+      <View style={styles.screen}>
+        <NavBar title="Incident details" onBack={onBack} />
+        <View style={styles.scrollContent}>
+          <Text style={styles.detailHeaderTitle}>Incident not found</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const st = STATUS[incident.status as keyof typeof STATUS] ?? STATUS.cancelled;
+  const triggerLabel = incident.source === "SHAKE" ? "Shake trigger" : "Button trigger";
+  const locText = incident.location
+    ? `${incident.location.lat.toFixed(4)}, ${incident.location.lon.toFixed(4)}`
+    : "Location unavailable";
+
   return (
     <View style={styles.screen}>
       <NavBar
@@ -201,65 +295,44 @@ export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
             <Siren size={24} color={colors.emergency} />
           </View>
           <View style={styles.detailHeaderTextWrap}>
-            <Text style={styles.detailHeaderTitle}>SOS triggered</Text>
-            <Text style={styles.detailHeaderSub}>12 Jun 2026 · 9:42 PM · 100 Ft Road underpass</Text>
+            <Text style={styles.detailHeaderTitle}>SOS — {triggerLabel}</Text>
+            <Text style={styles.detailHeaderSub}>
+              {formatDate(incident.startTime)} · {formatTime(incident.startTime)} · {locText}
+            </Text>
             <View style={styles.badgeWrap}>
-              <Badge tone="success">Resolved · you marked yourself safe</Badge>
+              <Badge tone={st.tone as any}>{st.label}</Badge>
             </View>
           </View>
         </View>
 
-        {/* Danger Score */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.scoreRow}>
-            <Text style={styles.scoreTitle}>Danger score</Text>
-            <Text style={styles.scoreValue}>78</Text>
-          </View>
-          <View style={styles.scoreBarTrack}>
-            <View style={[styles.scoreBarFill, { width: "78%" }]} />
-          </View>
-          <Text style={styles.scoreDesc}>
-            Based on time of day, past reports in this stretch and distance from lit roads.
-          </Text>
-        </Card>
-
-        {/* Aegis AI observations */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.aiTitleRow}>
-            <Sparkles size={17} color={colors.primary} />
-            <Text style={styles.aiTitle}>What Aegis noticed</Text>
-          </View>
-          <Text style={styles.aiBullet}>• Stopped moving for 4 minutes in a normally walked stretch.</Text>
-          <Text style={styles.aiBullet}>• Route deviated 180 m from the planned path.</Text>
-          <Text style={styles.aiBullet}>• Similar reports here peak between 9 PM and 11 PM.</Text>
-        </Card>
-
         {/* Timeline */}
         <Text style={styles.sectionHeading}>TIMELINE</Text>
         <Card style={styles.sectionCard}>
-          {MOCK_INCIDENT_TIMELINE.map((s, i) => (
-            <TimelineItem
-              key={s.id}
-              time={s.time}
-              title={s.title}
-              detail={s.detail}
-              tone={s.tone}
-              last={i === MOCK_INCIDENT_TIMELINE.length - 1}
-            />
-          ))}
+          {incident.timeline.map((entry, i) => {
+            const step = describeTimelineStep(entry);
+            return (
+              <TimelineItem
+                key={`${entry.step}-${entry.timestamp}-${i}`}
+                time={step.time}
+                title={step.title}
+                detail={step.detail}
+                tone={step.tone}
+                last={i === incident.timeline.length - 1}
+              />
+            );
+          })}
         </Card>
 
-        {/* Evidence */}
-        <Text style={styles.sectionHeading}>EVIDENCE</Text>
-        <Card style={styles.evidenceCard}>
-          <View style={styles.evidenceIconWrap}>
-            <Mic size={20} color={colors.primary} />
-          </View>
-          <View style={styles.evidenceTextWrap}>
-            <Text style={styles.evidenceTitle}>Audio · 8 min 42 s</Text>
-            <Text style={styles.evidenceSub}>Encrypted · stored on your device only</Text>
-          </View>
-        </Card>
+        {incident.contactsNotified.length > 0 && (
+          <>
+            <Text style={styles.sectionHeading}>CONTACTS NOTIFIED</Text>
+            <Card style={styles.sectionCard}>
+              {incident.contactsNotified.map((phone) => (
+                <Text key={phone} style={styles.aiBullet}>• {phone}</Text>
+              ))}
+            </Card>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -321,19 +394,6 @@ const styles = StyleSheet.create({
   detailHeaderTitle: { fontSize: 22, fontWeight: "700", color: colors.foreground },
   detailHeaderSub: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
   sectionCard: { padding: 16, marginBottom: 14 },
-  scoreRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  scoreTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  scoreValue: { fontSize: 22, fontWeight: "700", color: colors.emergency },
-  scoreBarTrack: { height: 8, backgroundColor: colors.surface, borderRadius: 4, marginVertical: 10, overflow: "hidden" },
-  scoreBarFill: { height: "100%", backgroundColor: colors.emergency, borderRadius: 4 },
-  scoreDesc: { fontSize: 13, color: colors.mutedForeground, lineHeight: 18 },
-  aiTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  aiTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   aiBullet: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
   sectionHeading: { fontSize: 13, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5, marginTop: 12, marginBottom: 8 },
-  evidenceCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-  evidenceIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: `${colors.primary}15`, alignItems: "center", justifyContent: "center" },
-  evidenceTextWrap: { flex: 1 },
-  evidenceTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  evidenceSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
 });

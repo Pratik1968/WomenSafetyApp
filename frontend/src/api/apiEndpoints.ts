@@ -16,6 +16,13 @@ export const API_ENDPOINTS = {
   EMERGENCY_PRESIGNED_URL: '/api/v1/emergency/presigned-url',
   EMERGENCY_HISTORY: '/api/v1/emergency/history',
 
+  // Incident Timeline — Module 19 (emergency-service/app/routers/incidents.py)
+  // Deliberately separate from EMERGENCY_ALERT/EMERGENCY_HISTORY above, which
+  // belong to modules/emergency/services/emergencyService.ts's voice/journey/
+  // fall-detection pipeline — do not merge these.
+  EMERGENCY_INCIDENTS_SYNC: '/api/v1/emergency/incidents/sync',
+  EMERGENCY_INCIDENTS_HISTORY: '/api/v1/emergency/incidents/history',
+
   // User Service (user-service/router.py)
   USER_PROFILE: '/api/v1/user/profile',
   USER_HISTORY: '/api/v1/user/history',

@@ -64,7 +64,7 @@ export type RootStackParamList = {
   Settings: undefined;
   DataPrivacy: undefined;
   ManageContacts: undefined;
-  IncidentDetail: undefined;
+  IncidentDetail: { incidentId: string };
   HomeStub: undefined;
   IncomingCall: undefined;
   Wearable: undefined;
@@ -345,9 +345,21 @@ function HistoryRouteScreen({ navigation }: NativeStackScreenProps<RootStackPara
         else if (t === "safety") navigation.navigate("Safety");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onOpen={() => navigation.navigate("IncidentDetail")}
+      onOpen={(incidentId: string) => navigation.navigate("IncidentDetail", { incidentId })}
       onAssistant={() => navigation.navigate("Assistant")}
       onSos={() => navigation.navigate("Sos", { state: "active" })}
+    />
+  );
+}
+
+function IncidentDetailRouteScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, "IncidentDetail">) {
+  return (
+    <IncidentDetailScreen
+      incidentId={route.params.incidentId}
+      onBack={() => navigation.goBack()}
     />
   );
 }
@@ -442,7 +454,7 @@ export function RootStack() {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
         <Stack.Screen name="ManageContacts" component={ManageContactsRouteScreen} />
-        <Stack.Screen name="IncidentDetail" component={IncidentDetailScreen} />
+        <Stack.Screen name="IncidentDetail" component={IncidentDetailRouteScreen} />
         <Stack.Screen name="HomeStub" component={HomeStubScreen} />
         <Stack.Screen name="IncomingCall" component={IncomingCallRouteScreen} />
         <Stack.Screen name="Wearable" component={WearableScreen} />
