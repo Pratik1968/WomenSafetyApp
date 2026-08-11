@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   StyleSheet,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -22,6 +23,8 @@ import {
   AlertTriangle,
   Clock,
   MapPin,
+  PhoneCall,
+  HeartHandshake,
 } from "lucide-react-native";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
@@ -31,16 +34,20 @@ import { SectionHeader } from "../components/ds/SectionHeader";
 import { BottomNav, type TabKey } from "../components/app/BottomNav";
 import { Dialog } from "../components/ds/Dialog";
 import { AppButton } from "../components/ds/AppButton";
+import { getMyProfile } from "../services/profileService";
+import { SosCountdownOverlay } from "../components/app/SosCountdownOverlay";
+import {
+  startShakeDetection,
+  stopShakeDetection,
+  addShakeTriggerListener,
+} from "../services/sosNativeService";
+import type { SOSTriggerSource } from "../services/sosOrchestratorService";
 
 export type HomeState = "default" | "monitoring" | "caution" | "loading";
 
-const USER = {
-  firstName: "Aisha",
-  initials: "AP",
-};
-
 const QUICK_ACTIONS = [
   { label: "Safe Route", icon: RouteIcon },
+  { label: "Fake Call", icon: PhoneCall },
   { label: "Nearby Police", icon: ShieldCheck },
   { label: "Hospitals", icon: Ambulance },
   { label: "AI Assistant", icon: Sparkles },
@@ -49,7 +56,7 @@ const QUICK_ACTIONS = [
 ];
 
 const RECENT_ACTIVITY = [
-  { id: "1", kind: "journey", title: "Safe walk completed", detail: "Indiranagar to Koramangala · 18 min", time: "22m ago" },
+  { id: "1", kind: "journey", title: "Safe walk completed", detail: "Indiranagar to Koramangala • 18 min", time: "22m ago" },
   { id: "2", kind: "sos", title: "Test SOS pulse", detail: "All 3 emergency contacts responded", time: "2h ago" },
   { id: "3", kind: "report", title: "Area safety update", detail: "Street lighting issue reported in Sector 4", time: "1d ago" },
 ];
@@ -105,6 +112,7 @@ export function HomeScreen({
   onSafetyMode,
   onAssistant,
   onQuickAction,
+  onQuickActionLongPress,
   onTab,
   locationPermissionGranted = true,
   notificationPermissionGranted = true,
@@ -115,14 +123,76 @@ export function HomeScreen({
   onSafetyMode?: () => void;
   onAssistant?: () => void;
   onQuickAction?: (actionLabel: string) => void;
+  onQuickActionLongPress?: (actionLabel: string) => void;
   onTab?: (t: TabKey) => void;
   locationPermissionGranted?: boolean;
   notificationPermissionGranted?: boolean;
 }) {
   const [pressed, setPressed] = useState(false);
+  const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
   const loading = state === "loading";
 
-  const handleSosTrigger = async () => {
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const data = await getMyProfile();
+      if (isMounted && data) {
+        setProfile(data);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const firstName = profile?.full_name ? profile.full_name.trim().split(/\s+/)[0] : "User";
+  const initials = profile?.full_name
+    ? profile.full_name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join("")
+        .substring(0, 2)
+        .toUpperCase()
+    : "U";
+
+  // ── Countdown overlay state ───────────────────────────────────
+  const [countdownVisible, setCountdownVisible] = useState(false);
+  const [countdownSource, setCountdownSource] = useState<SOSTriggerSource>("BUTTON");
+
+  const showCountdown = useCallback(
+    (source: SOSTriggerSource) => {
+      setCountdownSource(source);
+      setCountdownVisible(true);
+    },
+    []
+  );
+
+  const handleCountdownFire = useCallback(() => {
+    setCountdownVisible(false);
+    setPressed(true);
+    onSos?.();
+  }, [onSos]);
+
+  const handleCountdownCancel = useCallback(() => {
+    setCountdownVisible(false);
+    setPressed(false);
+  }, []);
+
+  // ── Start native shake-detection service on mount ────────────
+  useEffect(() => {
+    startShakeDetection();
+    const sub = addShakeTriggerListener(() => {
+      showCountdown("SHAKE");
+    });
+    return () => {
+      sub.remove();
+      stopShakeDetection();
+    };
+  }, [showCountdown]);
+
+  const handleSosTrigger = useCallback(async () => {
     try {
       if (typeof Location?.requestForegroundPermissionsAsync === "function") {
         await Location.requestForegroundPermissionsAsync();
@@ -133,26 +203,33 @@ export function HomeScreen({
     } catch (err) {
       console.warn("Native SOS permission request error:", err);
     }
-    setPressed(true);
-    onSos?.();
-  };
+    showCountdown("BUTTON");
+  }, [showCountdown]);
 
   const status =
     state === "monitoring"
-      ? { tone: "brand", title: "Safety Mode is on", sub: "Office → Home · arriving 9:36 PM" }
+      ? { tone: "brand", title: "Safety Mode is on", sub: "Office — Home • arriving 9:36 PM" }
       : state === "caution"
       ? { tone: "warning", title: "Extra care tonight", sub: "3 recent reports within 500 m" }
-      : { tone: "success", title: "You're in a safe area", sub: "Indiranagar · updated just now" };
+      : { tone: "success", title: "You're in a safe area", sub: "Indiranagar • updated just now" };
 
   return (
     <View style={styles.screen}>
+      {/* SOS Countdown Overlay — appears over everything for 4 s before firing */}
+      <SosCountdownOverlay
+        visible={countdownVisible}
+        triggerSource={countdownSource}
+        onFire={handleCountdownFire}
+        onCancel={handleCountdownCancel}
+      />
+
       <View style={styles.header}>
         <LinearGradient colors={gradientBrand as unknown as [string, string, ...string[]]} style={styles.avatar}>
-          <Text style={styles.avatarText}>{USER.initials}</Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </LinearGradient>
         <View style={styles.headerText}>
           <Text style={styles.greeting}>Good evening,</Text>
-          <Text style={styles.userName}>{USER.firstName}</Text>
+          <Text style={styles.userName}>{firstName}</Text>
         </View>
         <Pressable
           onPress={onNotifications}
@@ -212,12 +289,52 @@ export function HomeScreen({
             </Text>
             <Text style={styles.safetyModeSub}>
               {state === "monitoring"
-                ? "2 contacts watching · tap to view"
+                ? "2 contacts watching • tap to view"
                 : "We watch over your journey until you arrive"}
             </Text>
           </View>
           <ChevronRight size={18} color={colors.mutedForeground} />
         </Pressable>
+
+        {/* 1-Tap Emergency Helplines */}
+        <View style={styles.section}>
+          <SectionHeader title="Emergency Helplines" />
+          <View style={styles.helplinesRow}>
+            <Pressable
+              style={styles.helplineCard}
+              onPress={() => Linking.openURL("tel:1091")}
+              accessibilityLabel="Call Women Helpline 1091"
+            >
+              <View style={[styles.helplineIconWrap, { backgroundColor: "#ec489915" }]}>
+                <HeartHandshake size={22} color="#ec4899" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.helplineTitle}>Women Helpline</Text>
+                <Text style={styles.helplineNumber}>1091</Text>
+              </View>
+              <View style={styles.callBadge}>
+                <PhoneCall size={14} color={colors.primaryForeground} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.helplineCard}
+              onPress={() => Linking.openURL("tel:112")}
+              accessibilityLabel="Call Police Helpline 112"
+            >
+              <View style={[styles.helplineIconWrap, { backgroundColor: `${colors.emergency}15` }]}>
+                <Siren size={22} color={colors.emergency} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.helplineTitle}>Police Helpline</Text>
+                <Text style={styles.helplineNumber}>112 / 100</Text>
+              </View>
+              <View style={[styles.callBadge, { backgroundColor: colors.emergency }]}>
+                <PhoneCall size={14} color={colors.primaryForeground} />
+              </View>
+            </Pressable>
+          </View>
+        </View>
 
         {/* Quick Actions Grid */}
         <View style={styles.section}>
@@ -227,6 +344,8 @@ export function HomeScreen({
               <Pressable
                 key={label}
                 onPress={() => onQuickAction?.(label)}
+                onLongPress={() => onQuickActionLongPress?.(label)}
+                delayLongPress={300}
                 style={styles.actionItem}
               >
                 <Icon size={22} color={colors.primary} strokeWidth={1.8} />
@@ -381,6 +500,35 @@ const styles = StyleSheet.create({
   safetyModeTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   safetyModeSub: { fontSize: 13, color: colors.mutedForeground },
   section: { marginBottom: 24 },
+  helplinesRow: { flexDirection: "row", gap: 12 },
+  helplineCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.xl,
+    padding: 12,
+    gap: 10,
+  },
+  helplineIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  helplineTitle: { fontSize: 13, fontWeight: "600", color: colors.foreground },
+  helplineNumber: { fontSize: 14, fontWeight: "700", color: colors.primary, marginTop: 1 },
+  callBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionItem: {
     width: "31%",

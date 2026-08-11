@@ -66,5 +66,9 @@ if [ -n "$DRY_RUN" ]; then
 fi
 
 echo "deploying (create-or-update): ${staged[*]}"
-( cd "$ROOT" && supabase functions deploy --project-ref "$PROJECT_REF" )
+# --use-api bundles server-side (no local Docker), which avoids the slow/stuck
+# Docker-based bundler. Set DEPLOY_WITH_DOCKER=1 to fall back to the Docker path.
+DEPLOY_FLAGS="--use-api"
+[ -n "${DEPLOY_WITH_DOCKER:-}" ] && DEPLOY_FLAGS=""
+( cd "$ROOT" && supabase functions deploy --project-ref "$PROJECT_REF" $DEPLOY_FLAGS )
 echo "done."

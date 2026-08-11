@@ -8,6 +8,12 @@ import {
   JourneySummaryScreen,
 } from "./SafetyModeScreens";
 
+jest.mock("../hooks/useEmergencyContacts", () => ({
+  useEmergencyContacts: () => ({
+    contacts: [{ id: "c1", name: "Amma", relation: "MOTHER", phone: "9999999999", initials: "AM" }],
+  }),
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -28,7 +34,7 @@ describe("SafetyModeScreens", () => {
   it("renders JourneyContactsScreen correctly", async () => {
     await render(<JourneyContactsScreen />);
     expect(screen.getByText("Who should know?")).toBeTruthy();
-    expect(screen.getByText("Continue without contacts")).toBeTruthy();
+    expect(screen.getByText("Amma")).toBeTruthy();
   });
 
   it("renders JourneyConsentScreen correctly", async () => {
@@ -39,15 +45,14 @@ describe("SafetyModeScreens", () => {
 
   it("renders JourneyActiveScreen with metrics", async () => {
     await render(<JourneyActiveScreen />);
-    expect(screen.getByText("Office → Home")).toBeTruthy();
+    expect(screen.getByText("Office — Home")).toBeTruthy();
     expect(screen.getByText("9:36 PM")).toBeTruthy();
     expect(screen.getByText("62%")).toBeTruthy();
   });
 
   it("renders JourneySummaryScreen correctly", async () => {
     await render(<JourneySummaryScreen />);
-    expect(screen.getByText("You arrived safely")).toBeTruthy();
-    expect(screen.getByText("24 min")).toBeTruthy();
+    expect(screen.getByText("You're home safe.")).toBeTruthy();
     expect(screen.getByText("8.4 km")).toBeTruthy();
   });
 });

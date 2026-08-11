@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
+import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react-native";
 import { PhoneScreen } from "./PhoneScreen";
 
 afterEach(() => {
@@ -6,7 +6,6 @@ afterEach(() => {
 });
 
 test("continue is disabled until the number reaches the country's digit length, then calls onContinue", async () => {
-  jest.useFakeTimers();
   const onContinue = jest.fn();
   await render(<PhoneScreen onContinue={onContinue} />);
 
@@ -22,11 +21,9 @@ test("continue is disabled until the number reaches the country's digit length, 
   await act(async () => {
     fireEvent.press(screen.getByText("Continue"));
   });
-  await act(async () => {
-    jest.advanceTimersByTime(1000);
+  await waitFor(() => {
+    expect(onContinue).toHaveBeenCalledWith("+919876543210", expect.anything());
   });
-  expect(onContinue).toHaveBeenCalledWith("+91 9876543210", expect.anything());
-  jest.useRealTimers();
 });
 
 test("shows an error hint and disables continue when the number is too long for the country", async () => {

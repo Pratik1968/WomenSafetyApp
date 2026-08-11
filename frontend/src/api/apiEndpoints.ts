@@ -14,6 +14,8 @@ export const API_ENDPOINTS = {
   EMERGENCY_ALERT: '/api/v1/emergency/alert',
   EMERGENCY_PRESIGNED_URL: '/api/v1/emergency/presigned-url',
   EMERGENCY_HISTORY: '/api/v1/emergency/history',
+  EMERGENCY_INCIDENTS_SYNC: '/api/v1/emergency/incidents/sync',
+  EMERGENCY_INCIDENTS_HISTORY: '/api/v1/emergency/incidents/history',
 
   // User Service
   USER_PROFILE: '/api/v1/user/profile',

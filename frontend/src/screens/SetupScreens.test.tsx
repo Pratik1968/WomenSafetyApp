@@ -84,7 +84,7 @@ test("SetupContactsScreen shows the 2 preselected contacts and lets you remove o
   expect(screen.getByText("Amma")).toBeTruthy();
 
   await act(async () => {
-    fireEvent.press(screen.getByText("Amma"));
+    fireEvent.press(screen.getAllByLabelText("Remove contact")[0]);
   });
   expect(screen.getByText("1/5 contacts added")).toBeTruthy();
   expect(screen.queryByText("Amma")).toBeNull();
@@ -107,7 +107,7 @@ test("SetupMedicalScreen reflects typed input and always allows Continue", async
   await act(async () => {
     fireEvent.press(screen.getByText("Continue"));
   });
-  expect(onNext).toHaveBeenCalledTimes(1);
+  expect(onNext).toHaveBeenCalledWith({ allergies: "Penicillin", conditions: "", notes: "" });
 });
 
 test("SetupCompleteScreen calls onDone when 'Go to Home' is pressed", async () => {

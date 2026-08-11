@@ -3,7 +3,7 @@ import { Text, Pressable, ActivityIndicator, StyleSheet, type StyleProp, type Vi
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, gradientBrand } from "../../theme/tokens";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
 export type ButtonSize = "lg" | "md" | "sm";
 
 const SIZE_STYLE: Record<ButtonSize, { height: number; paddingHorizontal: number; fontSize: number }> = {
@@ -76,6 +76,7 @@ export function AppButton({
 const TEXT_COLOR: Record<ButtonVariant, string> = {
   primary: colors.primaryForeground,
   secondary: colors.foreground,
+  outline: colors.foreground,
   ghost: colors.mutedForeground,
   destructive: colors.emergencyForeground,
 };
@@ -83,6 +84,7 @@ const TEXT_COLOR: Record<ButtonVariant, string> = {
 const VARIANT_STYLE = StyleSheet.create({
   primary: { overflow: "hidden" },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  outline: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border },
   ghost: { backgroundColor: "transparent" },
   destructive: { backgroundColor: colors.emergency },
 });
@@ -90,7 +92,10 @@ const VARIANT_STYLE = StyleSheet.create({
 const styles = StyleSheet.create({
   base: {
     position: "relative",
-    width: "100%",
+    // Stretch to full width inside column layouts (forms, sheets) — RN's default cross-axis
+    // stretch — without forcing 100% width when placed inline in a row (e.g. next to a text
+    // block), which would otherwise crush its siblings and overflow the container.
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

@@ -125,7 +125,15 @@ export function HistoryScreen({
   );
 }
 
-export function IncidentDetailScreen({ onBack }: { onBack?: () => void }) {
+export function IncidentDetailScreen({
+  id,
+  incidentId,
+  onBack,
+}: {
+  id?: string;
+  incidentId?: string;
+  onBack?: () => void;
+}) {
   return (
     <View style={styles.screen}>
       <NavBar
