@@ -27,6 +27,21 @@ jest.mock(
   () => ({
     requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     getForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    getCurrentPositionAsync: jest.fn().mockResolvedValue({
+      coords: { latitude: 12.9716, longitude: 77.5946 },
+    }),
+    reverseGeocodeAsync: jest.fn().mockResolvedValue([{ street: "5th Cross", city: "Indiranagar" }]),
+  }),
+  { virtual: true }
+);
+
+jest.mock(
+  "expo-image-picker",
+  () => ({
+    requestCameraPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    launchCameraAsync: jest.fn().mockResolvedValue({ canceled: true }),
+    launchImageLibraryAsync: jest.fn().mockResolvedValue({ canceled: true }),
   }),
   { virtual: true }
 );
@@ -58,6 +73,20 @@ jest.mock(
   () => ({
     Audio: {
       requestPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    },
+  }),
+  { virtual: true }
+);
+
+jest.mock(
+  "expo-speech-recognition",
+  () => ({
+    ExpoSpeechRecognitionModule: {
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      abort: jest.fn().mockResolvedValue(undefined),
+      requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
     },
   }),
   { virtual: true }
@@ -113,4 +142,5 @@ jest.mock(
 beforeEach(() => {
   global.fetch = jest.fn().mockRejectedValue(new Error("Network unavailable in tests"));
 });
+
 

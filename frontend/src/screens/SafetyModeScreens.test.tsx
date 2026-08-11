@@ -8,6 +8,12 @@ import {
   JourneySummaryScreen,
 } from "./SafetyModeScreens";
 
+jest.mock("../hooks/useEmergencyContacts", () => ({
+  useEmergencyContacts: () => ({
+    contacts: [{ id: "c1", name: "Amma", relation: "MOTHER", phone: "9999999999", initials: "AM" }],
+  }),
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -51,3 +57,4 @@ describe("SafetyModeScreens", () => {
     expect(screen.getByText("8.4 km")).toBeTruthy();
   });
 });
+

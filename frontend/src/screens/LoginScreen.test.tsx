@@ -28,7 +28,7 @@ describe("LoginScreen", () => {
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
-    global.fetch = mockFetch;
+    (globalThis as any).fetch = mockFetch;
 
     const onLoggedIn = jest.fn();
     await render(<LoginScreen onLoggedIn={onLoggedIn} />);
@@ -47,3 +47,4 @@ describe("LoginScreen", () => {
     }, { timeout: 3000 });
   });
 });
+

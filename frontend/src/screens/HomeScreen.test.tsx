@@ -22,13 +22,13 @@ describe("HomeScreen", () => {
     expect(onNotifications).toHaveBeenCalledTimes(1);
   });
 
-  it("triggers onSos callback when SOS hero button is pressed", async () => {
+  it("triggers SOS countdown when SOS hero button is pressed", async () => {
     const onSos = jest.fn();
     await render(<HomeScreen onSos={onSos} />);
     await act(async () => {
       fireEvent.press(screen.getByLabelText("Press and hold to send SOS"));
     });
-    expect(onSos).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("SOS activating…")).toBeTruthy();
   });
 
   it("renders quick actions grid items", async () => {
@@ -48,3 +48,4 @@ describe("HomeScreen", () => {
     expect(onQuickAction).toHaveBeenCalledWith("Safe Route");
   });
 });
+

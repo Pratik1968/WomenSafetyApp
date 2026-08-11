@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, TextInput, StyleSheet, Alert } from "react-native";
+import { View, Text, Pressable, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMyProfile, clearCurrentProfile } from "../services/profileService";
 import { AuroraHalo } from "../components/ds/Aurora";
@@ -7,6 +7,7 @@ import { AppButton } from "../components/ds/AppButton";
 import { NavBar } from "../components/ds/NavBar";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { colors } from "../theme/tokens";
+import { useAuth } from "../context";
 
 export type OtpScreenState = "empty" | "autofill" | "error" | "loading" | "success";
 
@@ -48,6 +49,7 @@ export function OtpScreen({
   onBack?: () => void;
   onVerified?: (hasProfile?: boolean) => void;
 }) {
+  const { isAuthenticated, user } = useAuth();
   const initial =
     state === "autofill" || state === "loading"
       ? CORRECT
@@ -72,8 +74,6 @@ export function OtpScreen({
 
   useEffect(() => {
     if (state !== "empty") return;
-    // Only pre-fill in named test states (autofill/success) driven by props, never silently.
-    // Real Firebase confirmation must be present for actual phone auth.
   }, [state, confirmation]);
 
   const verify = async () => {
@@ -88,7 +88,6 @@ export function OtpScreen({
         setPhase("success");
         setTimeout(() => onVerified?.(!!profile), 1400);
       } else {
-        // No Firebase confirmation object — real auth could not be established.
         setPhase("error");
         Alert.alert(
           "Phone verification failed",
@@ -115,63 +114,67 @@ export function OtpScreen({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <NavBar onBack={onBack} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <NavBar onBack={onBack} />
 
-      <View style={styles.content}>
-        <Text style={styles.headline}>Enter the code</Text>
-        <Text style={styles.body}>
-          Sent to <Text style={styles.bodyStrong}>{phone}</Text>
-        </Text>
+        <View style={styles.content}>
+          <Text style={styles.headline}>Enter the code</Text>
+          <Text style={styles.body}>
+            Sent to <Text style={styles.bodyStrong}>{phone}</Text>
+          </Text>
 
-        <Pressable onPress={() => inputRef.current?.focus()} style={styles.boxesPressable}>
-          <OtpBoxes code={code} invalid={phase === "error"} />
-        </Pressable>
-        <TextInput
-          ref={inputRef}
-          testID="otp-hidden-input"
-          value={code}
-          keyboardType="number-pad"
-          maxLength={6}
-          onChangeText={(text) => {
-            setCode(text.replace(/\D/g, "").slice(0, 6));
-            if (phase === "error") setPhase("idle");
-          }}
-          style={styles.hiddenInput}
-          accessibilityLabel="Verification code"
-        />
+          <Pressable onPress={() => inputRef.current?.focus()} style={styles.boxesPressable}>
+            <OtpBoxes code={code} invalid={phase === "error"} />
+          </Pressable>
+          <TextInput
+            ref={inputRef}
+            testID="otp-hidden-input"
+            value={code}
+            keyboardType="number-pad"
+            maxLength={6}
+            onChangeText={(text) => {
+              setCode(text.replace(/\D/g, "").slice(0, 6));
+              if (phase === "error") setPhase("idle");
+            }}
+            style={styles.hiddenInput}
+            accessibilityLabel="Verification code"
+          />
 
-        {phase === "error" ? (
-          <Text style={styles.errorText}>That code isn't right. Check the message and try again.</Text>
-        ) : code.length === 6 ? (
-          <Text style={styles.hintText}>Code detected from your messages.</Text>
-        ) : (
-          <Text style={styles.hintText}>Waiting for the SMS…</Text>
-        )}
-
-        <View style={styles.resendWrap}>
-          {seconds > 0 ? (
-            <Text style={styles.resendText}>
-              Resend code in <Text style={styles.resendCount}>0:{String(seconds).padStart(2, "0")}</Text>
-            </Text>
+          {phase === "error" ? (
+            <Text style={styles.errorText}>That code isn't right. Check the message and try again.</Text>
+          ) : code.length === 6 ? (
+            <Text style={styles.hintText}>Code detected from your messages.</Text>
           ) : (
-            <Pressable onPress={() => setSeconds(28)}>
-              <Text style={styles.resendButton}>Resend code</Text>
-            </Pressable>
+            <Text style={styles.hintText}>Waiting for the SMS…</Text>
           )}
-        </View>
-      </View>
 
-      <View style={styles.footer}>
-        <AppButton disabled={code.length < 6} loading={phase === "loading"} onPress={verify}>
-          Verify
-        </AppButton>
-      </View>
+          <View style={styles.resendWrap}>
+            {seconds > 0 ? (
+              <Text style={styles.resendText}>
+                Resend code in <Text style={styles.resendCount}>0:{String(seconds).padStart(2, "0")}</Text>
+              </Text>
+            ) : (
+              <Pressable onPress={() => setSeconds(28)}>
+                <Text style={styles.resendButton}>Resend code</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <AppButton disabled={code.length < 6} loading={phase === "loading"} onPress={verify}>
+            Verify
+          </AppButton>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  skipText: { fontSize: 14, fontWeight: "600", color: colors.primary, paddingHorizontal: 12 },
   content: { flex: 1, paddingHorizontal: 32, paddingTop: 16 },
   headline: { fontSize: 30, lineHeight: 35, fontWeight: "600", letterSpacing: -0.9, color: colors.foreground },
   body: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground },
@@ -205,3 +208,4 @@ const styles = StyleSheet.create({
   },
   successBody: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground, textAlign: "center" },
 });
+

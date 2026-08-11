@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import {
+  AlertCircle,
   MapPin,
   Search,
   Check,
@@ -10,6 +12,9 @@ import {
   Car,
   Bus,
   Eye,
+  Mic,
+  MicOff,
+  Sparkles,
   TriangleAlert,
   ShieldCheck,
   Trash2,
@@ -18,6 +23,8 @@ import {
   Users,
   PhoneCall,
   Siren,
+  Volume2,
+  ShieldAlert,
 } from "lucide-react-native";
 import { colors, gradientBrand, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
@@ -26,8 +33,14 @@ import { Card } from "../components/ds/Card";
 import { NavBar } from "../components/ds/NavBar";
 import { ProgressBar } from "../components/ds/ProgressBar";
 import { SectionHeader } from "../components/ds/SectionHeader";
+import { SelectRow } from "../components/ds/SelectRow";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { Aurora } from "../components/ds/Aurora";
+import { NativeEmergencyModule } from "../modules/EmergencyModule";
+import { useVoiceState } from "../context/VoiceContext";
+import { useJourney } from "../context/JourneyContext";
+import { useEmergencyContacts } from "../hooks/useEmergencyContacts";
+import { JourneyConfig, JourneyContact, JourneyDestination, TransportMode } from "../modules/safetyMode/types/journey.types";
 
 const STEP_COUNT = 4;
 
@@ -42,12 +55,6 @@ const TRANSPORT = [
   { id: "bike", label: "Two-wheeler", detail: "Helmet impact & speed drop detection", icon: Bike },
   { id: "cab", label: "Cab / Auto", detail: "Route drift & unexpected stop checks", icon: Car },
   { id: "transit", label: "Public Transit", detail: "Stop notifications & safe exit monitoring", icon: Bus },
-];
-
-const PHONE_CONTACTS = [
-  { id: "c1", name: "Amma", relation: "Mother", initials: "A" },
-  { id: "c2", name: "Meera", relation: "Sister", initials: "M" },
-  { id: "c3", name: "Nanna", relation: "Father", initials: "N" },
 ];
 
 function StepHeader({ step, title, body, onBack }: { step: number; title: string; body: string; onBack?: () => void }) {
@@ -194,62 +201,222 @@ export function JourneyTransportScreen({
   );
 }
 
-/* Step 3: Contacts */
+/* Step 3: Contacts — populated from real Supabase emergency contacts */
 export function JourneyContactsScreen({
   onBack,
   onNext,
+  onContactsSelected,
 }: {
   onBack?: () => void;
   onNext?: () => void;
+  onContactsSelected?: (contacts: JourneyContact[]) => void;
 }) {
-  const [selected, setSelected] = useState<string[]>(["c1", "c2"]);
+  const { contacts: realContacts } = useEmergencyContacts();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (realContacts.length > 0 && selectedIds.length === 0) {
+      setSelectedIds(realContacts.map((c) => c.id));
+    }
+  }, [realContacts]);
+
   const toggle = (id: string) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    setSelectedIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const handleContinue = () => {
+    const selected: JourneyContact[] = realContacts
+      .filter((c) => selectedIds.includes(c.id))
+      .map((c) => ({ id: c.id, name: c.name, relation: c.relation, phone: c.phone }));
+    onContactsSelected?.(selected);
+    onNext?.();
+  };
 
   return (
     <View style={styles.screen}>
       <StepHeader
         step={3}
         title="Who should know?"
-        body="Optional. Chosen contacts see your live journey — nobody else does."
+        body="Chosen contacts will see your live journey. Only they can see it."
         onBack={onBack}
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.contactsList}>
-          {PHONE_CONTACTS.map((c) => {
-            const on = selected.includes(c.id);
-            return (
-              <Pressable key={c.id} onPress={() => toggle(c.id)} style={styles.contactItem}>
-                <View style={styles.contactAvatar}>
-                  <Text style={styles.contactInitials}>{c.initials}</Text>
-                </View>
-                <View style={styles.contactText}>
-                  <Text style={styles.contactName}>{c.name}</Text>
-                  <Text style={styles.contactRelation}>{c.relation}</Text>
-                </View>
-                {on ? (
-                  <LinearGradient colors={gradientBrand as unknown as [string, string, ...string[]]} style={styles.checkboxOn}>
-                    <Check size={14} color={colors.primaryForeground} strokeWidth={3} />
-                  </LinearGradient>
-                ) : (
-                  <View style={styles.checkboxOff} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
+        {realContacts.length === 0 ? (
+          <View style={styles.emptyContacts}>
+            <Users size={32} color={colors.mutedForeground} />
+            <Text style={styles.emptyContactsText}>
+              No emergency contacts saved yet.{"\n"}Add contacts in your Profile to share your journey.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.contactsList}>
+            {realContacts.map((c) => {
+              const on = selectedIds.includes(c.id);
+              const initials = c.initials || c.name.substring(0, 2).toUpperCase();
+              return (
+                <Pressable key={c.id} onPress={() => toggle(c.id)} style={styles.contactItem}>
+                  <View style={styles.contactAvatar}>
+                    <Text style={styles.contactInitials}>{initials}</Text>
+                  </View>
+                  <View style={styles.contactText}>
+                    <Text style={styles.contactName}>{c.name}</Text>
+                    <Text style={styles.contactRelation}>{c.relation}</Text>
+                  </View>
+                  {on ? (
+                    <LinearGradient colors={gradientBrand as unknown as [string, string, ...string[]]} style={styles.checkboxOn}>
+                      <Check size={14} color={colors.primaryForeground} strokeWidth={3} />
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.checkboxOff} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.footerStack}>
-        <AppButton onPress={onNext}>
-          Continue with {selected.length} contact{selected.length === 1 ? "" : "s"}
+        <AppButton onPress={handleContinue}>
+          {selectedIds.length > 0
+            ? `Continue with ${selectedIds.length} contact${selectedIds.length === 1 ? '' : 's'}`
+            : 'Continue without contacts'}
         </AppButton>
-        <AppButton variant="ghost" size="md" onPress={onNext}>
+        <AppButton variant="ghost" size="md" onPress={() => { onContactsSelected?.([]); onNext?.(); }}>
           Skip for now
         </AppButton>
       </View>
     </View>
+  );
+}
+
+/* ---------------------------------- AI Voice Recognition & Detection Card */
+
+export function SafetyModeVoiceCard() {
+  const {
+    recognitionState,
+    isListening,
+    recognizedText,
+    partialText,
+    currentLanguage,
+    volumeLevel,
+    speechError,
+    startListening,
+    stopListening,
+    changeLanguage,
+  } = useVoiceState();
+
+  const { latestEmergencyEvent } = useJourney();
+
+  useEffect(() => {
+    console.log("Voice screen mounted");
+  }, []);
+
+  const [showLanguages, setShowLanguages] = useState(false);
+
+  const activeTranscript = recognizedText || partialText;
+  const isDetected = !!latestEmergencyEvent;
+
+  return (
+    <Card style={styles.voiceCard}>
+      <View style={styles.voiceHeader}>
+        <View style={styles.voiceTitleRow}>
+          <Mic size={20} color={colors.primary} />
+          <Text style={styles.voiceTitle}>AI Voice SOS & Keyword Detection</Text>
+        </View>
+        {isDetected ? (
+          <Badge tone="emergency">Keyword Detected</Badge>
+        ) : isListening ? (
+          <Badge tone="brand">Listening...</Badge>
+        ) : recognitionState === "PROCESSING" ? (
+          <Badge tone="warning">Processing...</Badge>
+        ) : (
+          <Badge tone="neutral">Idle</Badge>
+        )}
+      </View>
+
+      <Text style={styles.voiceSub}>
+        Hands-free voice recognition automatically detects distress keywords like "Help", "Emergency", or "Save me".
+      </Text>
+
+      <View style={styles.transcriptBox}>
+        <Text style={styles.transcriptLabel}>Live Speech Transcript:</Text>
+        <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
+          {activeTranscript ? `"${activeTranscript}"` : "Speak to test keyword detection..."}
+        </Text>
+
+        {isListening && (
+          <View style={styles.volumeRow}>
+            <Volume2 size={14} color={colors.primary} />
+            <View style={styles.volumeTrack}>
+              <View style={[styles.volumeFill, { width: `${Math.min(100, volumeLevel * 100)}%` }]} />
+            </View>
+            <Text style={styles.volumeText}>{Math.round(volumeLevel * 100)}%</Text>
+          </View>
+        )}
+      </View>
+
+      {isDetected && latestEmergencyEvent && (
+        <View style={styles.detectedBox}>
+          <Sparkles size={18} color={colors.emergency} />
+          <View style={styles.detectedTextWrap}>
+            <Text style={styles.detectedTitle}>
+              Keyword Detected: "{latestEmergencyEvent.detectedKeyword}"
+            </Text>
+            <Text style={styles.detectedDetail}>
+              Confidence: {Math.round((latestEmergencyEvent.confidence || 0) * 100)}% · Language: {latestEmergencyEvent.language || currentLanguage}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {speechError && (
+        <View style={styles.errorBox}>
+          <AlertCircle size={16} color={colors.emergency} />
+          <Text style={styles.errorText}>{speechError}</Text>
+        </View>
+      )}
+
+      <Pressable onPress={() => setShowLanguages(!showLanguages)} style={styles.langToggle}>
+        <Text style={styles.langToggleText}>
+          Language: <Text style={styles.langValue}>{currentLanguage}</Text> (Tap to change)
+        </Text>
+      </Pressable>
+
+      {showLanguages && (
+        <View style={styles.langList}>
+          {[
+            { id: "en-US", label: "English (US)" },
+            { id: "hi-IN", label: "Hindi (India)" },
+            { id: "ta-IN", label: "Tamil (India)" },
+            { id: "te-IN", label: "Telugu (India)" },
+            { id: "es-ES", label: "Spanish" },
+          ].map((l) => (
+            <SelectRow
+              key={l.id}
+              label={l.label}
+              selected={currentLanguage === l.id}
+              onPress={() => {
+                changeLanguage(l.id as any);
+                setShowLanguages(false);
+              }}
+            />
+          ))}
+        </View>
+      )}
+
+      <AppButton
+        variant={isListening ? "secondary" : "primary"}
+        size="md"
+        leading={isListening ? <MicOff size={16} color={colors.foreground} /> : <Mic size={16} color={colors.primaryForeground} />}
+        onPress={isListening ? stopListening : () => {
+          console.log("Voice button pressed");
+          startListening(currentLanguage);
+        }}
+      >
+        {isListening ? "Stop Voice Detection" : "Start Voice Detection"}
+      </AppButton>
+    </Card>
   );
 }
 
@@ -280,6 +447,7 @@ export function JourneyConsentScreen({
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <SafetyModeVoiceCard />
         <View style={styles.promisesList}>
           {PROMISES.map(({ icon: Icon, title, body }) => (
             <Card key={title} style={styles.promiseCard}>
@@ -302,9 +470,6 @@ export function JourneyConsentScreen({
   );
 }
 
-import { useEffect } from "react";
-import * as Location from "expo-location";
-
 /* Active Monitored Journey */
 export function JourneyActiveScreen({
   state = "active",
@@ -316,8 +481,10 @@ export function JourneyActiveScreen({
   onSos?: () => void;
 }) {
   const offRoute = state !== "active";
+  const { emergencyActive, latestEmergencyEvent, endJourney } = useJourney();
 
   useEffect(() => {
+    let isActive = true;
     (async () => {
       try {
         if (typeof Location?.requestForegroundPermissionsAsync === "function") {
@@ -326,11 +493,25 @@ export function JourneyActiveScreen({
             await Location.requestBackgroundPermissionsAsync();
           }
         }
+        if (isActive && NativeEmergencyModule?.startForegroundNotification) {
+          await NativeEmergencyModule.startForegroundNotification();
+        }
       } catch (err) {
-        console.warn("Safety mode location permission request error:", err);
+        console.warn("Safety mode foreground/location request error:", err);
       }
     })();
+    return () => {
+      isActive = false;
+      if (NativeEmergencyModule?.stopForegroundNotification) {
+        NativeEmergencyModule.stopForegroundNotification().catch((e: unknown) => console.warn(e));
+      }
+    };
   }, []);
+
+  const handleEnd = () => {
+    endJourney();
+    onEnd?.();
+  };
 
   return (
     <View style={styles.screen}>
@@ -338,7 +519,7 @@ export function JourneyActiveScreen({
         <View style={[styles.activePill, offRoute && styles.activePillWarning]}>
           <View style={[styles.activeDot, offRoute && styles.activeDotWarning]} />
           <Text style={styles.activePillText}>
-            {offRoute ? "Checking on you" : "We're watching over you"}
+            {emergencyActive ? "Emergency Active" : offRoute ? "Checking on you" : "We're watching over you"}
           </Text>
         </View>
       </View>
@@ -409,11 +590,54 @@ export function JourneyActiveScreen({
           <Siren size={18} color={colors.emergencyForeground} />
           <Text style={styles.activeActionBtnSosText}>SOS</Text>
         </Pressable>
-        <Pressable style={[styles.activeActionBtn, styles.activeActionBtnArrived]} onPress={onEnd}>
+        <Pressable style={[styles.activeActionBtn, styles.activeActionBtnArrived]} onPress={handleEnd}>
           <Check size={18} color={colors.foreground} />
           <Text style={styles.activeActionBtnArrivedText}>Arrived</Text>
         </Pressable>
       </View>
+
+      {emergencyActive && (
+        <View style={styles.emergencyOverlay}>
+          <View style={styles.emergencyOverlayCard}>
+            <View style={styles.emergencyOverlayIconRow}>
+              <ShieldAlert size={32} color={colors.emergency} />
+            </View>
+            <Text style={styles.emergencyOverlayTitle}>Emergency Active</Text>
+            {latestEmergencyEvent && (
+              <>
+                <Text style={styles.emergencyOverlayKeyword}>
+                  "{latestEmergencyEvent.detectedKeyword}" detected
+                </Text>
+                <Text style={styles.emergencyOverlayDetail}>
+                  {latestEmergencyEvent.location.address || 'Location captured'}
+                </Text>
+                <Text style={styles.emergencyOverlayDetail}>
+                  {new Date(latestEmergencyEvent.timestamp).toLocaleTimeString()}
+                </Text>
+              </>
+            )}
+            <Text style={styles.emergencyOverlayContacts}>
+              Your emergency contacts have been notified.
+            </Text>
+            <AppButton
+              variant="destructive"
+              size="md"
+              onPress={onSos}
+              style={styles.emergencyOverlaySosBtn}
+            >
+              Send Full SOS
+            </AppButton>
+            <AppButton
+              variant="ghost"
+              size="md"
+              onPress={handleEnd}
+              style={styles.emergencyOverlayEndBtn}
+            >
+              End Journey
+            </AppButton>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -427,7 +651,7 @@ export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
         <SuccessCheck size={96} />
         <Text style={styles.summaryTitle}>You arrived safely</Text>
         <Text style={styles.summarySub}>
-          Safety Mode ended automatically. Amma and Meera have been told you're home.
+          Safety Mode ended. Your emergency contacts have been notified that you arrived safely.
         </Text>
 
         <Card style={styles.summaryCard}>
@@ -457,10 +681,10 @@ export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  stepHeaderWrap: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
-  stepHeaderTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 16 },
-  stepHeaderBody: { fontSize: 15, color: colors.mutedForeground, marginTop: 6, lineHeight: 22 },
-  searchWrap: { paddingHorizontal: 20, marginBottom: 16 },
+  stepHeaderWrap: { paddingHorizontal: 32, paddingTop: 12, paddingBottom: 16 },
+  stepHeaderTitle: { fontSize: 24, fontWeight: "700", color: colors.foreground, marginTop: 16, letterSpacing: -0.2 },
+  stepHeaderBody: { fontSize: 14, color: colors.mutedForeground, marginTop: 6, lineHeight: 20 },
+  searchWrap: { paddingHorizontal: 32, marginBottom: 8 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -476,36 +700,25 @@ const styles = StyleSheet.create({
   textForeground: { color: colors.foreground, fontWeight: "500" },
   textMuted: { color: colors.mutedForeground },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 32, paddingBottom: 24 },
   placesList: { gap: 10, marginTop: 8 },
   placeItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl,
+    borderRadius: radii.xl2,
     padding: 14,
     gap: 12,
   },
-  placeItemPicked: { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}50` },
-  placeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  placeItemPicked: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
+  placeIcon: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   placeText: { flex: 1 },
   placeTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  placeDetail: { fontSize: 13, color: colors.mutedForeground },
+  placeDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 1 },
   checkBadge: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  footer: { paddingHorizontal: 20, paddingBottom: 20 },
-  footerStack: { paddingHorizontal: 20, paddingBottom: 20, gap: 8 },
-  transportList: { gap: 12 },
+  transportList: { gap: 12, marginTop: 16 },
   transportItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -516,145 +729,164 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
   },
-  transportItemSelected: { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}50` },
-  transportIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  transportItemSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
+  transportIcon: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   transportIconSelected: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   transportText: { flex: 1 },
   transportLabel: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   transportDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
-  contactsList: { gap: 8 },
-  contactItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, gap: 12 },
-  contactAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  contactInitials: { fontSize: 15, fontWeight: "700", color: colors.foreground },
-  contactText: { flex: 1 },
-  contactName: { fontSize: 16, fontWeight: "600", color: colors.foreground },
-  contactRelation: { fontSize: 13, color: colors.mutedForeground },
-  checkboxOn: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  checkboxOff: { width: 24, height: 24, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  consentHeader: { paddingHorizontal: 20, paddingTop: 16, marginBottom: 16 },
-  consentHeading: { fontSize: 32, fontWeight: "800", color: colors.foreground },
-  consentGradientHeading: { fontSize: 32, fontWeight: "800", color: colors.primary },
-  consentSub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, lineHeight: 22 },
-  promisesList: { gap: 12 },
-  promiseCard: { flexDirection: "row", gap: 14, padding: 16 },
-  promiseIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  promiseTextWrap: { flex: 1 },
-  promiseTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  promiseBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
-  activeHeader: { paddingHorizontal: 20, paddingTop: 20, alignItems: "center" },
-  activePill: {
+  emptyContacts: { alignItems: "center", justifyContent: "center", paddingVertical: 40, gap: 12 },
+  emptyContactsText: { fontSize: 14, color: colors.mutedForeground, textAlign: "center", lineHeight: 20 },
+  contactsList: { gap: 12, marginTop: 16 },
+  contactItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: `${colors.success}15`,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
-  },
-  activePillWarning: { backgroundColor: `${colors.warning}20` },
-  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
-  activeDotWarning: { backgroundColor: colors.warning },
-  activePillText: { fontSize: 13, fontWeight: "600", color: colors.foreground },
-  mapContainerStub: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.xl2,
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 16,
-    gap: 6,
+    padding: 14,
+    gap: 14,
   },
+  contactAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: `${colors.primary}15`, alignItems: "center", justifyContent: "center" },
+  contactInitials: { fontSize: 15, fontWeight: "700", color: colors.primary },
+  contactText: { flex: 1 },
+  contactName: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  contactRelation: { fontSize: 13, color: colors.mutedForeground },
+  checkboxOn: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  checkboxOff: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.border },
+  voiceCard: { padding: 16, marginBottom: 16 },
+  voiceHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  voiceTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  voiceTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
+  voiceSub: { fontSize: 13, color: colors.mutedForeground, lineHeight: 18, marginBottom: 12 },
+  transcriptBox: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: 12, marginBottom: 12 },
+  transcriptLabel: { fontSize: 11, fontWeight: "600", color: colors.mutedForeground, textTransform: "uppercase" },
+  transcriptText: { fontSize: 14, color: colors.foreground, marginTop: 4, fontStyle: "italic" },
+  transcriptPlaceholder: { color: colors.mutedForeground, fontStyle: "normal" },
+  volumeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  volumeTrack: { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: "hidden" },
+  volumeFill: { height: "100%", backgroundColor: colors.primary },
+  volumeText: { fontSize: 11, color: colors.mutedForeground, minWidth: 28 },
+  detectedBox: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: `${colors.emergency}15`, borderWidth: 1, borderColor: colors.emergency, borderRadius: radii.md, padding: 12, marginBottom: 12 },
+  detectedTextWrap: { flex: 1 },
+  detectedTitle: { fontSize: 14, fontWeight: "700", color: colors.emergency },
+  detectedDetail: { fontSize: 12, color: colors.foreground, marginTop: 2 },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  errorText: { fontSize: 13, color: colors.emergency },
+  langToggle: { marginBottom: 12 },
+  langToggleText: { fontSize: 13, color: colors.mutedForeground },
+  langValue: { fontWeight: "600", color: colors.foreground },
+  langList: { gap: 4, marginBottom: 12 },
+  consentHeader: { paddingHorizontal: 32, paddingTop: 16, paddingBottom: 8 },
+  consentHeading: { fontSize: 32, fontWeight: "800", color: colors.foreground, letterSpacing: -0.5 },
+  consentGradientHeading: { fontSize: 32, fontWeight: "800", color: colors.primary, letterSpacing: -0.5 },
+  consentSub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, lineHeight: 22 },
+  promisesList: { gap: 12, marginTop: 12 },
+  promiseCard: { flexDirection: "row", gap: 14, padding: 16 },
+  promiseIconWrap: { width: 36, height: 36, borderRadius: 12, backgroundColor: `${colors.primary}15`, alignItems: "center", justifyContent: "center" },
+  promiseTextWrap: { flex: 1 },
+  promiseTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
+  promiseBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
+  activeHeader: { paddingHorizontal: 32, paddingTop: 16, paddingBottom: 8, alignItems: "center" },
+  activePill: { flexDirection: "row", alignItems: "center", backgroundColor: `${colors.primary}15`, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  activePillWarning: { backgroundColor: `${colors.warning}20` },
+  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  activeDotWarning: { backgroundColor: colors.warning },
+  activePillText: { fontSize: 13, fontWeight: "600", color: colors.foreground },
+  mapContainerStub: { height: 160, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.xl2, alignItems: "center", justifyContent: "center", gap: 6, marginVertical: 12 },
   mapStubHeading: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   mapStubDetail: { fontSize: 13, color: colors.mutedForeground },
-  offRouteBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${colors.warning}15`,
-    borderWidth: 1,
-    borderColor: `${colors.warning}40`,
-    borderRadius: radii.xl,
-    padding: 14,
-    gap: 12,
-    marginBottom: 16,
-  },
+  offRouteBox: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: `${colors.warning}18`, borderWidth: 1, borderColor: colors.warning, borderRadius: radii.xl, padding: 14, marginBottom: 12 },
   offRouteText: { flex: 1 },
   offRouteTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  offRouteBody: { fontSize: 13, color: colors.mutedForeground },
-  escalatingBox: {
-    backgroundColor: `${colors.emergency}15`,
-    borderWidth: 1,
-    borderColor: `${colors.emergency}40`,
-    borderRadius: radii.xl,
-    padding: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
+  offRouteBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
+  escalatingBox: { backgroundColor: `${colors.emergency}15`, borderWidth: 1, borderColor: colors.emergency, borderRadius: radii.xl2, padding: 16, gap: 10, marginBottom: 12 },
   warningRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   escalatingTitle: { fontSize: 16, fontWeight: "700", color: colors.emergency },
-  escalatingBody: { fontSize: 13, color: colors.foreground },
-  escalatingButtons: { flexDirection: "row", gap: 10, marginTop: 8 },
-  journeyMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  escalatingBody: { fontSize: 13, color: colors.foreground, lineHeight: 18 },
+  escalatingButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
+  journeyMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 12 },
   journeyMetaTitle: { fontSize: 18, fontWeight: "700", color: colors.foreground },
   metricsRow: { flexDirection: "row", gap: 10, marginTop: 16 },
-  metricCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.xl,
-    padding: 12,
-    alignItems: "center",
-    gap: 4,
-  },
+  metricCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.xl, padding: 12, alignItems: "center", gap: 4 },
   metricValue: { fontSize: 16, fontWeight: "700", color: colors.foreground },
-  metricLabel: { fontSize: 11, color: colors.mutedForeground },
-  activeActionsRow: { flexDirection: "row", paddingHorizontal: 20, paddingBottom: 20, gap: 12 },
-  activeActionBtn: {
-    flex: 1,
-    height: 54,
-    backgroundColor: colors.emergency,
-    borderRadius: radii.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  activeActionBtnArrived: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  metricLabel: { fontSize: 12, color: colors.mutedForeground },
+  activeActionsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 32, paddingBottom: 24 },
+  activeActionBtn: { flex: 1, height: 52, borderRadius: radii.xl, backgroundColor: colors.emergency, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   activeActionBtnSosText: { fontSize: 16, fontWeight: "700", color: colors.emergencyForeground },
-  activeActionBtnArrivedText: { fontSize: 16, fontWeight: "700", color: colors.foreground },
+  activeActionBtnArrived: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  activeActionBtnArrivedText: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  emergencyOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.75)", alignItems: "center", justifyContent: "center", padding: 24 },
+  emergencyOverlayCard: { backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.emergency, borderRadius: radii.xl2, padding: 24, width: "100%", alignItems: "center", gap: 12 },
+  emergencyOverlayIconRow: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${colors.emergency}20`, alignItems: "center", justifyContent: "center" },
+  emergencyOverlayTitle: { fontSize: 22, fontWeight: "800", color: colors.emergency },
+  emergencyOverlayKeyword: { fontSize: 16, fontWeight: "700", color: colors.foreground },
+  emergencyOverlayDetail: { fontSize: 13, color: colors.mutedForeground },
+  emergencyOverlayContacts: { fontSize: 14, color: colors.foreground, textAlign: "center" },
+  emergencyOverlaySosBtn: { width: "100%", marginTop: 8 },
+  emergencyOverlayEndBtn: { width: "100%" },
   summaryScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
-  summaryContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
-  summaryTitle: { fontSize: 26, fontWeight: "700", color: colors.foreground, marginTop: 20, textAlign: "center" },
-  summarySub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 8, lineHeight: 22 },
-  summaryCard: { width: "100%", marginTop: 24, padding: 20 },
-  summaryMetricsGrid: { flexDirection: "row", justifyContent: "space-around", textAlign: "center" },
-  summaryMetricValue: { fontSize: 18, fontWeight: "700", color: colors.foreground, textAlign: "center" },
-  summaryMetricLabel: { fontSize: 12, color: colors.mutedForeground, textAlign: "center", marginTop: 2 },
-});
+  summaryContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  summaryTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 24, textAlign: "center" },
+  summarySub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, textAlign: "center", lineHeight: 22 },
+  summaryCard: { marginTop: 24, width: "100%", padding: 20 },
+  summaryMetricsGrid: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
+  summaryMetricValue: { fontSize: 20, fontWeight: "700", color: colors.foreground, textAlign: "center" },
+  summaryMetricLabel: { fontSize: 12, color: colors.mutedForeground, marginTop: 4, textAlign: "center" },
+  footer: { paddingHorizontal: 32, paddingBottom: 24 },
+  footerStack: { paddingHorizontal: 32, paddingBottom: 24, gap: 8 },
+});export function SafetyModeScreen({
+  onDone,
+  onSos,
+}: {
+  onDone?: () => void;
+  onSos?: () => void;
+}) {
+  const [step, setStep] = useState<"destination" | "transport" | "contacts" | "consent" | "active" | "summary">("destination");
+
+  const [selectedDestination, setSelectedDestination] = useState<JourneyDestination>({ name: "Home", address: "100 Ft Road, Indiranagar" });
+  const [selectedTransport, setSelectedTransport] = useState<TransportMode>("cab");
+  const [selectedContacts, setSelectedContacts] = useState<JourneyContact[]>([]);
+
+  const { startJourney, endJourney } = useJourney();
+
+  const handleStart = async () => {
+    const config: JourneyConfig = {
+      destination: selectedDestination,
+      transport: selectedTransport,
+      contacts: selectedContacts,
+    };
+    await startJourney(config);
+    setStep("active");
+  };
+
+  const handleEnd = () => {
+    endJourney();
+    setStep("summary");
+  };
+
+  if (step === "destination") {
+    return <JourneyDestinationScreen onBack={onDone} onNext={() => setStep("transport")} />;
+  }
+  if (step === "transport") {
+    return <JourneyTransportScreen onBack={() => setStep("destination")} onNext={() => setStep("contacts")} />;
+  }
+  if (step === "contacts") {
+    return (
+      <JourneyContactsScreen
+        onBack={() => setStep("transport")}
+        onNext={() => setStep("consent")}
+        onContactsSelected={(contacts) => setSelectedContacts(contacts)}
+      />
+    );
+  }
+  if (step === "consent") {
+    return <JourneyConsentScreen onBack={() => setStep("contacts")} onStart={handleStart} />;
+  }
+  if (step === "active") {
+    return <JourneyActiveScreen onEnd={handleEnd} onSos={onSos} />;
+  }
+  return <JourneySummaryScreen onDone={onDone} />;
+}
+

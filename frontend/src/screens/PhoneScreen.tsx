@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { View, Text, Pressable, TextInput, StyleSheet, Alert } from "react-native";
+import { View, Text, Pressable, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronDown, Search } from "lucide-react-native";
-import { signInWithPhoneNumber } from "@react-native-firebase/auth";
+import { signInWithPhoneNumber, signOut } from "@react-native-firebase/auth";
 import { auth, clearPasswordSessionToken } from "../services/firebaseConfig";
 import { AppButton } from "../components/ds/AppButton";
 import { AppInput } from "../components/ds/Field";
@@ -11,6 +11,7 @@ import { ListItem } from "../components/ds/ListItem";
 import { NavBar } from "../components/ds/NavBar";
 import { COUNTRIES, type Country } from "../data/countries";
 import { colors } from "../theme/tokens";
+import { useAuth } from "../context";
 
 export type PhoneScreenState = "empty" | "filled" | "invalid" | "loading";
 
@@ -23,6 +24,7 @@ export function PhoneScreen({
   onBack?: () => void;
   onContinue?: (phone: string, confirmation: any) => void;
 }) {
+  const { isAuthenticated, user } = useAuth();
   const [country, setCountry] = useState<Country>(COUNTRIES[0]);
   const [value, setValue] = useState(state === "empty" ? "" : state === "invalid" ? "98123" : "98765 43210");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -43,12 +45,12 @@ export function PhoneScreen({
   }, [query]);
 
   const handleSendOtp = async () => {
-    const fullPhone = `${country.dial} ${value.replace(/\s/g, "")}`;
+    const fullPhone = `${country.dial}${value.replace(/\s/g, "")}`;
     setBusy(true);
     try {
       await clearPasswordSessionToken();
-      if (auth.currentUser && typeof (auth as any).signOut === "function") {
-        await (auth as any).signOut().catch(() => {});
+      if (auth.currentUser) {
+        await signOut(auth).catch(() => {});
       }
       const confirmation = await signInWithPhoneNumber(auth, fullPhone);
       setBusy(false);
@@ -64,41 +66,43 @@ export function PhoneScreen({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <NavBar onBack={onBack} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <NavBar onBack={onBack} />
 
-      <View style={styles.content}>
-        <Text style={styles.headline}>What's your number?</Text>
-        <Text style={styles.body}>We'll text you a 6-digit code to verify it's really you.</Text>
+        <View style={styles.content}>
+          <Text style={styles.headline}>What's your number?</Text>
+          <Text style={styles.body}>We'll text you a 6-digit code to verify it's really you.</Text>
 
-        <View style={styles.row}>
-          <Pressable onPress={() => setSheetOpen(true)} style={styles.countryButton}>
-            <Text style={styles.flag}>{country.flag}</Text>
-            <Text style={styles.dial}>{country.dial}</Text>
-            <ChevronDown size={16} color={colors.mutedForeground} />
-          </Pressable>
-          <View style={styles.inputWrap}>
-            <AppInput
-              value={value}
-              onChangeText={setValue}
-              keyboardType="phone-pad"
-              placeholder="00000 00000"
-              invalid={invalid}
-              hint={invalid ? "That number doesn't look complete." : `${digits.length}/${country.digits} digits`}
-            />
+          <View style={styles.row}>
+            <Pressable onPress={() => setSheetOpen(true)} style={styles.countryButton}>
+              <Text style={styles.flag}>{country.flag}</Text>
+              <Text style={styles.dial}>{country.dial}</Text>
+              <ChevronDown size={16} color={colors.mutedForeground} />
+            </Pressable>
+            <View style={styles.inputWrap}>
+              <AppInput
+                value={value}
+                onChangeText={setValue}
+                keyboardType="phone-pad"
+                placeholder="00000 00000"
+                invalid={invalid}
+                hint={invalid ? "That number doesn't look complete." : `${digits.length}/${country.digits} digits`}
+              />
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.footer}>
-        <AppButton
-          disabled={!complete || invalid}
-          loading={loading}
-          onPress={handleSendOtp}
-        >
-          Continue
-        </AppButton>
-        <Text style={styles.legal}>Standard message rates may apply.</Text>
-      </View>
+        <View style={styles.footer}>
+          <AppButton
+            disabled={!complete || invalid}
+            loading={loading}
+            onPress={handleSendOtp}
+          >
+            Continue
+          </AppButton>
+          <Text style={styles.legal}>Standard message rates may apply.</Text>
+        </View>
+      </KeyboardAvoidingView>
 
       <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Select country">
         <View style={styles.searchRow}>
@@ -131,6 +135,8 @@ export function PhoneScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  skipText: { fontSize: 14, fontWeight: "600", color: colors.primary, paddingHorizontal: 12 },
   content: { flex: 1, paddingHorizontal: 32, paddingTop: 16 },
   headline: { fontSize: 30, lineHeight: 35, fontWeight: "600", letterSpacing: -0.9, color: colors.foreground },
   body: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground },
@@ -167,3 +173,4 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, height: "100%", fontSize: 16, color: colors.foreground },
 });
+
