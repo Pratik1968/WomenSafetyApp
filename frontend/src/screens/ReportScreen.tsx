@@ -1,6 +1,8 @@
-import { useState } from "react";
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from "react-native";
-import { Camera, ImagePlus, MapPin, ShieldCheck } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { View, Text, Pressable, ScrollView, TextInput, Image, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import { Camera, ImagePlus, MapPin, ShieldCheck, Video, X } from "lucide-react-native";
 import { colors, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
 import { Card } from "../components/ds/Card";
@@ -8,34 +10,83 @@ import { Chip } from "../components/ds/Chip";
 import { NavBar } from "../components/ds/NavBar";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { Aurora } from "../components/ds/Aurora";
+import { submitIncidentReport, type ReportType } from "../services/reportService";
 
-export type ReportState = "empty" | "filled" | "submitting" | "success";
-
-const REPORT_CATEGORIES = [
-  { id: "r1", label: "Low street lighting" },
-  { id: "r2", label: "Catcalling / Harassment" },
-  { id: "r3", label: "Suspicious activity" },
-  { id: "r4", label: "Deserted stretch" },
-  { id: "r5", label: "Lack of CCTV" },
+const REPORT_CATEGORIES: { id: ReportType; label: string }[] = [
+  { id: "HARASSMENT", label: "Harassment" },
+  { id: "THEFT", label: "Theft" },
+  { id: "ASSAULT", label: "Assault" },
+  { id: "STALKING", label: "Stalking" },
+  { id: "SUSPICIOUS_PERSON", label: "Suspicious person" },
+  { id: "UNSAFE_LOCATION", label: "Unsafe location" },
 ];
 
+const MAX_ATTACHMENTS = 5;
+
+type Attachment = { uri: string; type: string; name: string; kind: "PHOTO" | "VIDEO" };
+
+function assetToAttachment(asset: ImagePicker.ImagePickerAsset): Attachment {
+  const isVideo = asset.type === "video";
+  const type = asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
+  const name = asset.fileName || `${isVideo ? "video" : "photo"}-${Date.now()}.${isVideo ? "mp4" : "jpg"}`;
+  return { uri: asset.uri, type, name, kind: isVideo ? "VIDEO" : "PHOTO" };
+}
+
 export function ReportScreen({
-  state = "empty",
   onBack,
   onSubmitDone,
+  onViewCommunity,
 }: {
-  state?: ReportState;
   onBack?: () => void;
   onSubmitDone?: () => void;
+  onViewCommunity?: () => void;
 }) {
-  const [picked, setPicked] = useState<string[]>(state === "empty" ? [] : ["r1", "r4"]);
-  const [description, setDescription] = useState(
-    state === "empty"
-      ? ""
-      : "Streetlights on the 5th Cross stretch have been out for two weeks. It's completely dark between 9 and 11 PM."
-  );
+  const [picked, setPicked] = useState<ReportType | null>(null);
+  const [description, setDescription] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (state === "success") {
+  const refreshLocation = async () => {
+    setLocating(true);
+    setError(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setError("Location permission is needed to attach where this happened.");
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = position.coords;
+      setCoords({ latitude, longitude });
+
+      try {
+        const results = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const place = results?.[0];
+        if (place) {
+          const line = [place.street, place.city || place.subregion].filter(Boolean).join(", ");
+          setAddress(line || null);
+        }
+      } catch {
+        // Reverse geocoding is best-effort - coordinates alone are still enough to submit.
+      }
+    } catch {
+      setError("Couldn't get your current location. Check location services and try again.");
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (submitted) {
     return (
       <View style={styles.successScreen}>
         <Aurora />
@@ -43,32 +94,91 @@ export function ReportScreen({
           <SuccessCheck size={96} />
           <Text style={styles.successTitle}>Thank you for speaking up</Text>
           <Text style={styles.successSub}>
-            This stretch is now flagged for 47 women who walk here every week. Your name is never attached to a report.
+            This report helps others plan safer routes. Your name is never attached to a report.
           </Text>
         </View>
         <View style={styles.successFooter}>
           <AppButton onPress={onSubmitDone}>Done</AppButton>
+          {onViewCommunity && (
+            <Pressable onPress={onViewCommunity} style={styles.successLink}>
+              <Text style={styles.successLinkText}>View community reports</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
   }
 
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const addPhoto = async () => {
+    if (attachments.length >= MAX_ATTACHMENTS) return;
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      setError("Camera permission is needed to attach a photo.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (!result.canceled && result.assets?.[0]) {
+      setAttachments((prev) => [...prev, assetToAttachment(result.assets[0])]);
+    }
+  };
+
+  const addFromLibrary = async () => {
+    if (attachments.length >= MAX_ATTACHMENTS) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setError("Photo library permission is needed to attach media.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_ATTACHMENTS - attachments.length,
+    });
+    if (!result.canceled && result.assets?.length) {
+      setAttachments((prev) => [...prev, ...result.assets.map(assetToAttachment)].slice(0, MAX_ATTACHMENTS));
+    }
+  };
+
+  const removeAttachment = (uri: string) => setAttachments((prev) => prev.filter((a) => a.uri !== uri));
+
+  const canSubmit = picked !== null && coords !== null && !submitting;
+
+  const handleSubmit = async () => {
+    if (!picked || !coords) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitIncidentReport({
+        reportType: picked,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        description: description.trim() || undefined,
+        address: address || undefined,
+        mediaFiles: attachments,
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      console.warn("Failed to submit incident report:", err);
+      setError(err?.message || "Couldn't submit your report. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <NavBar title="Report unsafe area" onBack={onBack} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.mainTitle}>What felt unsafe here?</Text>
         <Text style={styles.mainSub}>
-          Pick everything that applies. Reports are anonymous and help others plan safer routes.
+          Pick the category that best fits. Reports are anonymous and help others plan safer routes.
         </Text>
 
         <View style={styles.categoriesWrap}>
           {REPORT_CATEGORIES.map((c) => (
-            <Chip key={c.id} active={picked.includes(c.id)} onPress={() => toggle(c.id)}>
+            <Chip key={c.id} active={picked === c.id} onPress={() => setPicked(c.id)}>
               {c.label}
             </Chip>
           ))}
@@ -87,31 +197,57 @@ export function ReportScreen({
           />
         </View>
 
-        <Text style={styles.sectionHeading}>PHOTO (OPTIONAL)</Text>
+        <Text style={styles.sectionHeading}>PHOTOS &amp; VIDEO (OPTIONAL)</Text>
         <View style={styles.photosGrid}>
-          <Pressable style={styles.photoUploadBtn}>
-            <Camera size={22} color={colors.mutedForeground} />
-          </Pressable>
-          <Pressable style={styles.photoUploadBtn}>
-            <ImagePlus size={22} color={colors.mutedForeground} />
-          </Pressable>
+          {attachments.map((a) => (
+            <View key={a.uri} style={styles.thumbWrap}>
+              {a.kind === "PHOTO" ? (
+                <Image source={{ uri: a.uri }} style={styles.thumbImage} />
+              ) : (
+                <View style={[styles.thumbImage, styles.videoThumb]}>
+                  <Video size={22} color={colors.mutedForeground} />
+                </View>
+              )}
+              <Pressable style={styles.thumbRemove} onPress={() => removeAttachment(a.uri)}>
+                <X size={12} color="#fff" />
+              </Pressable>
+            </View>
+          ))}
+          {attachments.length < MAX_ATTACHMENTS && (
+            <>
+              <Pressable style={styles.photoUploadBtn} onPress={addPhoto} testID="report-add-photo">
+                <Camera size={22} color={colors.mutedForeground} />
+              </Pressable>
+              <Pressable style={styles.photoUploadBtn} onPress={addFromLibrary} testID="report-add-library">
+                <ImagePlus size={22} color={colors.mutedForeground} />
+              </Pressable>
+            </>
+          )}
         </View>
 
         <Text style={styles.sectionHeading}>LOCATION</Text>
         <Card style={styles.locationCard}>
           <View style={styles.locationMapStub}>
             <MapPin size={22} color={colors.warning} />
-            <Text style={styles.locationMapStubText}>5th Cross, Indiranagar</Text>
+            <Text style={styles.locationMapStubText}>
+              {locating ? "Locating…" : address || (coords ? "Current location" : "Location unavailable")}
+            </Text>
           </View>
           <View style={styles.locationInfoRow}>
             <MapPin size={18} color={colors.primary} />
             <View style={styles.locationTextWrap}>
-              <Text style={styles.locationName}>5th Cross, Indiranagar</Text>
-              <Text style={styles.locationSub}>Current location · ±8 m</Text>
+              <Text style={styles.locationName}>{address || "Current location"}</Text>
+              <Text style={styles.locationSub}>
+                {coords ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}` : "Waiting for GPS fix"}
+              </Text>
             </View>
-            <Text style={styles.locationChangeBtn}>Change</Text>
+            <Pressable onPress={refreshLocation}>
+              <Text style={styles.locationChangeBtn}>{locating ? "…" : "Refresh"}</Text>
+            </Pressable>
           </View>
         </Card>
+
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.privacyNote}>
           <ShieldCheck size={16} color={colors.mutedForeground} />
@@ -122,11 +258,11 @@ export function ReportScreen({
       </ScrollView>
 
       <View style={styles.footer}>
-        <AppButton loading={state === "submitting"} disabled={picked.length === 0} onPress={onSubmitDone}>
+        <AppButton loading={submitting} disabled={!canSubmit} onPress={handleSubmit}>
           Submit report
         </AppButton>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -147,7 +283,7 @@ const styles = StyleSheet.create({
     minHeight: 110,
   },
   textArea: { fontSize: 15, color: colors.foreground, textAlignVertical: "top" },
-  photosGrid: { flexDirection: "row", gap: 12 },
+  photosGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   photoUploadBtn: {
     width: 80,
     height: 80,
@@ -156,6 +292,20 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderStyle: "dashed",
     backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbWrap: { width: 80, height: 80 },
+  thumbImage: { width: 80, height: 80, borderRadius: radii.xl },
+  videoThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
+  thumbRemove: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.foreground,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -175,6 +325,7 @@ const styles = StyleSheet.create({
   locationName: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   locationSub: { fontSize: 12, color: colors.mutedForeground },
   locationChangeBtn: { fontSize: 14, fontWeight: "600", color: colors.primary },
+  errorText: { fontSize: 13, color: colors.destructive, marginTop: 16 },
   privacyNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 16 },
   privacyNoteText: { flex: 1, fontSize: 12, color: colors.mutedForeground, lineHeight: 18 },
   footer: { paddingHorizontal: 20, paddingBottom: 20 },
@@ -182,5 +333,7 @@ const styles = StyleSheet.create({
   successContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, textAlign: "center" },
   successTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 24, textAlign: "center" },
   successSub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 12, lineHeight: 22 },
-  successFooter: { paddingHorizontal: 20, paddingBottom: 24 },
+  successFooter: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
+  successLink: { alignItems: "center", paddingVertical: 4 },
+  successLinkText: { fontSize: 14, fontWeight: "600", color: colors.primary },
 });

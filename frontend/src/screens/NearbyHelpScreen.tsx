@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet, Linking } from "react-native";
 import {
   Hospital,
   ShieldCheck,
@@ -26,15 +26,15 @@ const FILTERS = [
 ];
 
 const HELP_PLACES = [
-  { id: "1", name: "Indiranagar Police Station", kind: "police", detail: "100 Ft Road · 24/7 Desk", distance: "400 m", open: true },
-  { id: "2", name: "Manipal Hospital Emergency", kind: "hospital", detail: "HAL Old Airport Rd · Trauma Unit", distance: "1.2 km", open: true },
-  { id: "3", name: "St. John Women Safety Cell", kind: "ngo", detail: "Koramangala · Support & Shelter", distance: "2.4 km", open: true },
+  { id: "1", name: "Indiranagar Police Station", kind: "police", detail: "100 Ft Road • 24/7 Desk", distance: "400 m", open: true },
+  { id: "2", name: "Manipal Hospital Emergency", kind: "hospital", detail: "HAL Old Airport Rd • Trauma Unit", distance: "1.2 km", open: true },
+  { id: "3", name: "St. John Women Safety Cell", kind: "ngo", detail: "Koramangala • Support & Shelter", distance: "2.4 km", open: true },
 ];
 
 const EMERGENCY_NUMBERS = [
-  { id: "e1", label: "National Emergency", number: "112" },
-  { id: "e2", label: "Women Helpline", number: "1091" },
-  { id: "e3", label: "Ambulance", number: "108" },
+  { id: "e1", label: "National Emergency", number: "112", tag: "24/7 Police & Rescue" },
+  { id: "e2", label: "Women's Helpline", number: "1091", tag: "Priority Toll-Free" },
+  { id: "e3", label: "Ambulance Emergency", number: "108", tag: "Medical" },
 ];
 
 export function NearbyHelpScreen({
@@ -91,7 +91,7 @@ export function NearbyHelpScreen({
               </View>
               <View style={styles.placeTextWrap}>
                 <Text style={styles.placeTitle}>{places[0].name}</Text>
-                <Text style={styles.placeDetail}>{places[0].distance} · {places[0].open ? "Open now" : "Closed"}</Text>
+                <Text style={styles.placeDetail}>{places[0].distance} • {places[0].open ? "Open now" : "Closed"}</Text>
               </View>
               <View style={styles.mapNavCircle}>
                 <Navigation size={18} color={colors.primaryForeground} />
@@ -135,11 +135,19 @@ export function NearbyHelpScreen({
           <Text style={styles.sectionHeading}>EMERGENCY NUMBERS</Text>
           <Card style={styles.numbersCard}>
             {EMERGENCY_NUMBERS.map((n) => (
-              <Pressable key={n.id} style={styles.numberRow}>
+              <Pressable
+                key={n.id}
+                style={styles.numberRow}
+                onPress={() => Linking.openURL(`tel:${n.number}`)}
+                accessibilityLabel={`Call ${n.label} ${n.number}`}
+              >
                 <View style={styles.phoneIconWrap}>
                   <PhoneCall size={17} color={colors.emergency} />
                 </View>
-                <Text style={styles.numberLabel}>{n.label}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.numberLabel}>{n.label}</Text>
+                  <Text style={{ fontSize: 12, color: colors.mutedForeground }}>{n.tag}</Text>
+                </View>
                 <Text style={styles.numberValue}>{n.number}</Text>
               </Pressable>
             ))}

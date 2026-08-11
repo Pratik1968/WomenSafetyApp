@@ -39,9 +39,9 @@ export function OnboardingScreen({
     <SafeAreaView style={styles.screen}>
       <Aurora intensity="soft" />
       <View style={styles.topRow}>
-        {!isLast && onSkip ? (
+        {!isLast ? (
           <Pressable onPress={onSkip}>
-            <Text style={styles.skip}>⚡ Skip (Test Mode)</Text>
+            <Text style={styles.skip}>Skip</Text>
           </Pressable>
         ) : null}
       </View>

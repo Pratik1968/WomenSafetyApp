@@ -43,14 +43,15 @@ import { JourneyConfig, JourneyContact, JourneyDestination, TransportMode } from
 const STEP_COUNT = 4;
 
 const PLACES = [
-  { id: "p1", name: "Home", detail: "100 Ft Road, Indiranagar", tag: "Saved" },
-  { id: "p2", name: "Office", detail: "Koramangala 5th Block", tag: "Saved" },
-  { id: "p3", name: "Starbucks Indiranagar", detail: "12th Main Road", tag: "Recent" },
+  { id: "p1", name: "Home", detail: "100 Ft Road, Indiranagar", tag: "Recent" },
+  { id: "p2", name: "Office", detail: "Prestige Tech Park, Marathahalli", tag: "Saved" },
+  { id: "p3", name: "Gym", detail: "Cult Fit, 12th Main Road", tag: "Saved" },
+  { id: "p4", name: "Priya's Place", detail: "4th Block, Koramangala", tag: "Recent" },
 ];
 
 const TRANSPORT = [
-  { id: "walk", label: "Walking", detail: "Detailed step pacing & dark spot alerts", icon: Footprints },
-  { id: "bike", label: "Two-wheeler", detail: "Helmet impact & speed drop detection", icon: Bike },
+  { id: "walk", label: "Walking", detail: "Movement speed & stationary checks", icon: Footprints },
+  { id: "bike", label: "Two Wheeler", detail: "Continuous GPS & high-speed route tracking", icon: Bike },
   { id: "cab", label: "Cab / Auto", detail: "Route drift & unexpected stop checks", icon: Car },
   { id: "transit", label: "Public Transit", detail: "Stop notifications & safe exit monitoring", icon: Bus },
 ];
@@ -278,78 +279,67 @@ export function JourneyContactsScreen({
       <View style={styles.footerStack}>
         <AppButton onPress={handleContinue}>
           {selectedIds.length > 0
-            ? `Continue with ${selectedIds.length} contact${selectedIds.length === 1 ? '' : 's'}`
-            : 'Continue without contacts'}
+            ? `Share with ${selectedIds.length} contact${selectedIds.length > 1 ? "s" : ""}`
+            : "Continue without sharing"}
         </AppButton>
-        <AppButton variant="ghost" size="md" onPress={() => { onContactsSelected?.([]); onNext?.(); }}>
-          Skip for now
+        <AppButton variant="ghost" onPress={onNext}>
+          Skip
         </AppButton>
       </View>
     </View>
   );
 }
 
-/* ---------------------------------- AI Voice Recognition & Detection Card */
-
+/* Voice Detection Card for Step 4 */
 export function SafetyModeVoiceCard() {
   const {
-    recognitionState,
     isListening,
     recognizedText,
     partialText,
+    volumeLevel: audioLevel,
     currentLanguage,
-    volumeLevel,
     speechError,
     startListening,
     stopListening,
     changeLanguage,
   } = useVoiceState();
 
-  const { latestEmergencyEvent } = useJourney();
+  const { emergencyActive: isDetected, latestEmergencyEvent } = useJourney();
 
   const [showLanguages, setShowLanguages] = useState(false);
 
   const activeTranscript = recognizedText || partialText;
-  const isDetected = !!latestEmergencyEvent;
 
   return (
     <Card style={styles.voiceCard}>
       <View style={styles.voiceHeader}>
         <View style={styles.voiceTitleRow}>
-          <Mic size={20} color={colors.primary} />
-          <Text style={styles.voiceTitle}>AI Voice SOS & Keyword Detection</Text>
+          <Volume2 size={18} color={isListening ? colors.primary : colors.mutedForeground} />
+          <Text style={styles.voiceTitle}>Background Voice Detection</Text>
         </View>
-        {isDetected ? (
-          <Badge tone="emergency">Keyword Detected</Badge>
-        ) : isListening ? (
-          <Badge tone="brand">Listening...</Badge>
-        ) : recognitionState === "PROCESSING" ? (
-          <Badge tone="warning">Processing...</Badge>
-        ) : (
-          <Badge tone="neutral">Idle</Badge>
-        )}
+        <Badge tone={isListening ? "success" : "neutral"}>
+          {isListening ? "Listening" : "Standby"}
+        </Badge>
       </View>
 
       <Text style={styles.voiceSub}>
-        Hands-free voice recognition automatically detects distress keywords like "Help", "Emergency", or "Save me".
+        Listens for distress keywords like <Text style={{ fontWeight: "700" }}>"Help", "Bachao", "Save me"</Text> to trigger an auto-alert.
       </Text>
 
-      <View style={styles.transcriptBox}>
-        <Text style={styles.transcriptLabel}>Live Speech Transcript:</Text>
-        <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
-          {activeTranscript ? `"${activeTranscript}"` : "Speak to test keyword detection..."}
-        </Text>
-
-        {isListening && (
+      {isListening && (
+        <View style={styles.transcriptBox}>
+          <Text style={styles.transcriptLabel}>Live Audio Transcript</Text>
+          <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
+            {activeTranscript ? `"${activeTranscript}"` : "Say emergency keywords to trigger SOS..."}
+          </Text>
           <View style={styles.volumeRow}>
-            <Volume2 size={14} color={colors.primary} />
             <View style={styles.volumeTrack}>
-              <View style={[styles.volumeFill, { width: `${Math.min(100, volumeLevel * 100)}%` }]} />
+              <View style={[styles.volumeFill, { width: `${Math.min(100, Math.max(5, (audioLevel + 2) * 20))}%` }]} />
             </View>
-            <Text style={styles.volumeText}>{Math.round(volumeLevel * 100)}%</Text>
+            <Text style={styles.volumeText}>{audioLevel > -2 ? "Audio Active" : "Silent"}</Text>
           </View>
-        )}
-      </View>
+        </View>
+      )}
 
       {isDetected && latestEmergencyEvent && (
         <View style={styles.detectedBox}>
@@ -359,7 +349,7 @@ export function SafetyModeVoiceCard() {
               Keyword Detected: "{latestEmergencyEvent.detectedKeyword}"
             </Text>
             <Text style={styles.detectedDetail}>
-              Confidence: {Math.round((latestEmergencyEvent.confidence || 0) * 100)}% · Language: {latestEmergencyEvent.language || currentLanguage}
+              Confidence: {Math.round((latestEmergencyEvent.confidence || 0) * 100)}% • Language: {latestEmergencyEvent.language || currentLanguage}
             </Text>
           </View>
         </View>
@@ -519,7 +509,7 @@ export function JourneyActiveScreen({
         <View style={styles.mapContainerStub}>
           <MapPin size={24} color={offRoute ? colors.warning : colors.primary} />
           <Text style={styles.mapStubHeading}>Live Journey Track</Text>
-          <Text style={styles.mapStubDetail}>5.7 km travelled · 2.7 km to go</Text>
+          <Text style={styles.mapStubDetail}>5.7 km travelled • 2.7 km to go</Text>
         </View>
 
         {state === "escalating" ? (
@@ -551,7 +541,7 @@ export function JourneyActiveScreen({
         ) : null}
 
         <View style={styles.journeyMetaRow}>
-          <Text style={styles.journeyMetaTitle}>Office → Home</Text>
+          <Text style={styles.journeyMetaTitle}>Office — Home</Text>
           <Badge tone={offRoute ? "warning" : "success"}>{offRoute ? "Attention" : "On track"}</Badge>
         </View>
 
@@ -568,64 +558,55 @@ export function JourneyActiveScreen({
             <Text style={styles.metricValue}>62%</Text>
             <Text style={styles.metricLabel}>Battery</Text>
           </View>
-          <View style={styles.metricCard}>
-            <Users size={16} color={colors.primary} />
-            <Text style={styles.metricValue}>2</Text>
-            <Text style={styles.metricLabel}>Watching</Text>
-          </View>
         </View>
       </ScrollView>
 
       <View style={styles.activeActionsRow}>
-        <Pressable style={styles.activeActionBtn} onPress={onSos}>
-          <Siren size={18} color={colors.emergencyForeground} />
+        <Pressable onPress={onSos} style={styles.activeActionBtn}>
+          <Siren size={20} color={colors.emergencyForeground} />
           <Text style={styles.activeActionBtnSosText}>SOS</Text>
         </Pressable>
-        <Pressable style={[styles.activeActionBtn, styles.activeActionBtnArrived]} onPress={handleEnd}>
-          <Check size={18} color={colors.foreground} />
-          <Text style={styles.activeActionBtnArrivedText}>Arrived</Text>
+        <Pressable onPress={handleEnd} style={[styles.activeActionBtn, styles.activeActionBtnArrived]}>
+          <Check size={20} color={colors.foreground} />
+          <Text style={styles.activeActionBtnArrivedText}>I've arrived</Text>
         </Pressable>
       </View>
 
-      {/* ── Emergency Active Overlay ────────────────────────────────────── */}
+      {/* ── Emergency Active Overlay ─────────────────────────────────────────── */}
       {emergencyActive && (
         <View style={styles.emergencyOverlay}>
           <View style={styles.emergencyOverlayCard}>
             <View style={styles.emergencyOverlayIconRow}>
-              <ShieldAlert size={32} color={colors.emergency} />
+              <ShieldAlert size={36} color={colors.emergency} />
             </View>
-            <Text style={styles.emergencyOverlayTitle}>Emergency Active</Text>
-            {latestEmergencyEvent && (
-              <>
-                <Text style={styles.emergencyOverlayKeyword}>
-                  "{latestEmergencyEvent.detectedKeyword}" detected
-                </Text>
-                <Text style={styles.emergencyOverlayDetail}>
-                  {latestEmergencyEvent.location.address || 'Location captured'}
-                </Text>
-                <Text style={styles.emergencyOverlayDetail}>
-                  {new Date(latestEmergencyEvent.timestamp).toLocaleTimeString()}
-                </Text>
-              </>
-            )}
+            <Text style={styles.emergencyOverlayTitle}>EMERGENCY DETECTED</Text>
+            {latestEmergencyEvent?.detectedKeyword ? (
+              <Text style={styles.emergencyOverlayKeyword}>
+                Keyword: "{latestEmergencyEvent.detectedKeyword}"
+              </Text>
+            ) : null}
+            <Text style={styles.emergencyOverlayDetail}>
+              Emergency keyword recognized by speech monitor. Broadcasting live GPS coordinates to emergency contacts.
+            </Text>
             <Text style={styles.emergencyOverlayContacts}>
-              Your emergency contacts have been notified.
+              Contacts & Police notified.
             </Text>
             <AppButton
               variant="destructive"
-              size="md"
-              onPress={onSos}
+              size="lg"
+              leading={<Siren size={20} color="#fff" />}
               style={styles.emergencyOverlaySosBtn}
+              onPress={onSos}
             >
-              Send Full SOS
+              Open SOS Screen
             </AppButton>
             <AppButton
-              variant="ghost"
+              variant="secondary"
               size="md"
-              onPress={handleEnd}
               style={styles.emergencyOverlayEndBtn}
+              onPress={handleEnd}
             >
-              End Journey
+              Cancel / I am Safe
             </AppButton>
           </View>
         </View>
@@ -638,18 +619,15 @@ export function JourneyActiveScreen({
 export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
   return (
     <View style={styles.summaryScreen}>
-      <Aurora />
       <View style={styles.summaryContent}>
-        <SuccessCheck size={96} />
-        <Text style={styles.summaryTitle}>You arrived safely</Text>
-        <Text style={styles.summarySub}>
-          Safety Mode ended. Your emergency contacts have been notified that you arrived safely.
-        </Text>
+        <SuccessCheck />
+        <Text style={styles.summaryTitle}>You're home safe.</Text>
+        <Text style={styles.summarySub}>Your emergency contacts have been notified that you've arrived safely.</Text>
 
         <Card style={styles.summaryCard}>
           <View style={styles.summaryMetricsGrid}>
             <View>
-              <Text style={styles.summaryMetricValue}>24 min</Text>
+              <Text style={styles.summaryMetricValue}>28m</Text>
               <Text style={styles.summaryMetricLabel}>Duration</Text>
             </View>
             <View>
@@ -657,8 +635,8 @@ export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
               <Text style={styles.summaryMetricLabel}>Distance</Text>
             </View>
             <View>
-              <Text style={[styles.summaryMetricValue, { color: colors.success }]}>Calm</Text>
-              <Text style={styles.summaryMetricLabel}>Route rating</Text>
+              <Text style={styles.summaryMetricValue}>3</Text>
+              <Text style={styles.summaryMetricLabel}>Contacts shared</Text>
             </View>
           </View>
         </Card>
@@ -742,12 +720,12 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    height: 52,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.xl,
     paddingHorizontal: 16,
+    height: 48,
     gap: 12,
   },
   searchText: { fontSize: 15 },
@@ -763,26 +741,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.xl,
-    padding: 14,
-    gap: 12,
+    padding: 16,
+    gap: 14,
   },
-  placeItemPicked: { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}50` },
+  placeItemPicked: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
   placeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   placeText: { flex: 1 },
-  placeTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  placeDetail: { fontSize: 13, color: colors.mutedForeground },
-  checkBadge: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  footer: { paddingHorizontal: 20, paddingBottom: 20 },
-  footerStack: { paddingHorizontal: 20, paddingBottom: 20, gap: 8 },
+  placeTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  placeDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
+  checkBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   transportList: { gap: 12 },
   transportItem: {
     flexDirection: "row",
@@ -790,46 +770,71 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl2,
+    borderRadius: radii.xl,
     padding: 16,
     gap: 14,
   },
-  transportItemSelected: { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}50` },
+  transportItemSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
   transportIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
-  transportIconSelected: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  transportText: { flex: 1 },
-  transportLabel: { fontSize: 16, fontWeight: "600", color: colors.foreground },
-  transportDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
-  contactsList: { gap: 8 },
-  emptyContacts: { alignItems: "center", justifyContent: "center", paddingVertical: 40, gap: 12 },
-  emptyContactsText: { fontSize: 14, color: colors.mutedForeground, textAlign: "center", lineHeight: 20 },
-  contactItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, gap: 12 },
-  contactAvatar: {
+  transportIconSelected: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  contactInitials: { fontSize: 15, fontWeight: "700", color: colors.foreground },
+  transportText: { flex: 1 },
+  transportLabel: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  transportDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
+  emptyContacts: { alignItems: "center", justifyContent: "center", paddingVertical: 48, gap: 12 },
+  emptyContactsText: { fontSize: 14, color: colors.mutedForeground, textAlign: "center", lineHeight: 20 },
+  contactsList: { gap: 10 },
+  contactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.xl,
+    padding: 14,
+    gap: 12,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${colors.primary}15`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contactInitials: { fontSize: 14, fontWeight: "700", color: colors.primary },
   contactText: { flex: 1 },
-  contactName: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  contactName: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   contactRelation: { fontSize: 13, color: colors.mutedForeground },
-  checkboxOn: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  checkboxOff: { width: 24, height: 24, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  consentHeader: { paddingHorizontal: 20, paddingTop: 16, marginBottom: 16 },
+  checkboxOn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxOff: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  footer: { paddingHorizontal: 20, paddingBottom: 24 },
+  footerStack: { paddingHorizontal: 20, paddingBottom: 24, gap: 8 },
+  consentHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
   consentHeading: { fontSize: 32, fontWeight: "800", color: colors.foreground },
   consentGradientHeading: { fontSize: 32, fontWeight: "800", color: colors.primary },
   consentSub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, lineHeight: 22 },

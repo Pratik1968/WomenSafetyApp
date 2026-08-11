@@ -106,7 +106,7 @@ function TypingIndicator() {
   );
 }
 
-// ─── AssistantScreen ───────────────────────────────────────────────────────────
+// ─── AssistantScreen ─────────────────────────────────────────────────────────
 
 export function AssistantScreen({ onBack }: { onBack?: () => void }) {
   const { messages: aiMessages, isThinking, networkError, sendChatMessage, clearHistory } = useAI();
@@ -158,7 +158,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={0}
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <NavBar
         title="Ask Aegis"
         onBack={onBack}
@@ -176,25 +176,25 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         }
       />
 
-      {/* ── Location strip ─────────────────────────────────────────────────── */}
+      {/* ── Location strip ────────────────────────────────────────────────── */}
       {formattedAddress ? (
         <View style={styles.locationBar}>
           <MapPin size={12} color={colors.primary} />
           <Text style={styles.locationBarText} numberOfLines={1}>
             {formattedAddress}
           </Text>
-          <Text style={styles.locationBarBadge}>· Police 0.8km · Hospital 1.2km</Text>
+          <Text style={styles.locationBarBadge}>📍 Police 0.8km • 🏥 Hospital 1.2km</Text>
         </View>
       ) : null}
 
-      {/* ── Offline banner ──────────────────────────────────────────────────── */}
+      {/* ── Offline banner ───────────────────────────────────────────────── */}
       {networkError ? (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineBannerText}>⚡ Offline — cached responses in use</Text>
         </View>
       ) : null}
 
-      {/* ── Chat area ──────────────────────────────────────────────────────── */}
+      {/* ── Chat area ────────────────────────────────────────────────────── */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -205,7 +205,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         keyboardShouldPersistTaps="handled"
       >
         {!hasConversation ? (
-          /* ── Welcome state ─────────────────────────────────────────────── */
+          /* ── Welcome state ──────────────────────────────────────────────── */
           <View style={styles.welcomeWrap}>
             <LinearGradient
               colors={gradientBrand as unknown as [string, string, ...string[]]}
@@ -219,7 +219,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
             </Text>
           </View>
         ) : (
-          /* ── Messages list ─────────────────────────────────────────────── */
+          /* ── Messages list ──────────────────────────────────────────────── */
           <View style={styles.messagesList}>
             {aiMessages.map((m) => {
               if (m.role === "user") {
@@ -298,7 +298,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         )}
       </ScrollView>
 
-      {/* ── Suggestion chips (only before first message) ────────────────── */}
+      {/* ── Suggestion chips (only before first message) ─────────────────── */}
       {!hasConversation && (
         <ScrollView
           horizontal
@@ -322,7 +322,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         </ScrollView>
       )}
 
-      {/* ── Composer ───────────────────────────────────────────────────────── */}
+      {/* ── Composer ────────────────────────────────────────────────────── */}
       <View style={styles.composerContainer}>
         <View style={styles.composerBar}>
           <TextInput

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "WomenSafty",
-    "slug": "womensafty",
+    "name": "Aegis",
+    "slug": "aegis-women-safety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -12,16 +12,25 @@
       "backgroundColor": "#090A0F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nameisrk.aegiswomensafety",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+        "NSMicrophoneUsageDescription": "Allow Aegis to access the microphone for emergency voice recognition and audio evidence.",
+        "NSLocationWhenInUseUsageDescription": "Allow Aegis to access your location to broadcast SOS coordinates.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+        "NSContactsUsageDescription": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
+      }
     },
     "android": {
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#090A0F",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/splash-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.womensafty.app",
+      "package": "com.nameisrk.aegiswomensafety",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
@@ -29,38 +38,44 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "READ_CONTACTS",
+        "WRITE_CONTACTS",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
         "FOREGROUND_SERVICE_MICROPHONE",
         "POST_NOTIFICATIONS",
         "WAKE_LOCK",
-        "VIBRATE"
+        "VIBRATE",
+        "CAMERA",
+        "CALL_PHONE",
+        "SEND_SMS"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow WomenSafty to access your contacts to select emergency contacts for SOS alerts."
+          "contactsPermission": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow WomenSafty to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident.",
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow WomenSafty to access your microphone for emergency voice recognition."
+          "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
       ]
     ]
   }
 }
-

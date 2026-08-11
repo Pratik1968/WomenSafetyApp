@@ -1,13 +1,29 @@
+import type { ReactElement } from "react";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-native";
+import { NavigationContainer } from "@react-navigation/native";
 import { SafetyScreen } from "./SafetyScreen";
+
+jest.mock("../hooks/useEmergencyContacts", () => ({
+  useEmergencyContacts: () => ({
+    contacts: [
+      { id: "c1", name: "Amma", relation: "MOTHER", phone: "+91 98765 43210", initials: "A" },
+      { id: "c2", name: "Meera", relation: "SISTER", phone: "+91 98765 43211", initials: "M" },
+    ],
+    refreshContacts: jest.fn(),
+  }),
+}));
 
 afterEach(() => {
   cleanup();
 });
 
 describe("SafetyScreen", () => {
+  const renderSafetyScreen = async (ui: ReactElement) => {
+    return render(<NavigationContainer>{ui}</NavigationContainer>);
+  };
+
   it("renders safety dashboard header and risk score", async () => {
-    await render(<SafetyScreen />);
+    await renderSafetyScreen(<SafetyScreen />);
     expect(screen.getAllByText("Safety")[0]).toBeTruthy();
     expect(screen.getByText("Everything that keeps tonight predictable.")).toBeTruthy();
     expect(screen.getByText("22")).toBeTruthy();
@@ -15,7 +31,7 @@ describe("SafetyScreen", () => {
   });
 
   it("renders elevated risk state when state prop is elevated", async () => {
-    await render(<SafetyScreen state="elevated" />);
+    await renderSafetyScreen(<SafetyScreen state="elevated" />);
     expect(screen.getByText("64")).toBeTruthy();
     expect(screen.getByText("Elevated risk")).toBeTruthy();
     expect(screen.getByText("Prefer lit roads tonight")).toBeTruthy();
@@ -23,7 +39,7 @@ describe("SafetyScreen", () => {
 
   it("triggers onSafetyMode callback when Safety Mode banner is pressed", async () => {
     const onSafetyMode = jest.fn();
-    await render(<SafetyScreen onSafetyMode={onSafetyMode} />);
+    await renderSafetyScreen(<SafetyScreen onSafetyMode={onSafetyMode} />);
     await act(async () => {
       fireEvent.press(screen.getByText("Safety Mode"));
     });
@@ -32,7 +48,7 @@ describe("SafetyScreen", () => {
 
   it("triggers onSafeRoute callback when Safe route card is pressed", async () => {
     const onSafeRoute = jest.fn();
-    await render(<SafetyScreen onSafeRoute={onSafeRoute} />);
+    await renderSafetyScreen(<SafetyScreen onSafeRoute={onSafeRoute} />);
     await act(async () => {
       fireEvent.press(screen.getByText("Safe route"));
     });

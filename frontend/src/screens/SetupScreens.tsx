@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Check, Plus, Search, Trash2, UserRound } from "lucide-react-native";
 import { NavBar } from "../components/ds/NavBar";
@@ -16,6 +16,11 @@ import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { AuroraHalo } from "../components/ds/Aurora";
 import { PHONE_CONTACTS, type PhoneContact } from "../data/mock";
 import { useEmergencyContacts } from "../hooks/useEmergencyContacts";
+import {
+  ContactDetailsSheet,
+  formatContactSubtitle,
+  nextAvailablePriority,
+} from "../components/app/ContactDetailsSheet";
 import { colors } from "../theme/tokens";
 
 export const SETUP_STEPS = 6;
@@ -46,28 +51,30 @@ function SetupShell({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <NavBar
-        onBack={onBack}
-        action={
-          onSkip ? (
-            <Pressable onPress={onSkip}>
-              <Text style={styles.skip}>⚡ Skip Setup (Test Mode)</Text>
-            </Pressable>
-          ) : undefined
-        }
-      />
-      <View style={styles.header}>
-        <ProgressBar value={step / SETUP_STEPS} />
-        <Text style={styles.stepCaption}>
-          Step {step} of {SETUP_STEPS}
-        </Text>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      </View>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <NavBar
+          onBack={onBack}
+          action={
+            onSkip ? (
+              <Pressable onPress={onSkip}>
+                <Text style={styles.skip}>Skip</Text>
+              </Pressable>
+            ) : undefined
+          }
+        />
+        <View style={styles.header}>
+          <ProgressBar value={step / SETUP_STEPS} />
+          <Text style={styles.stepCaption}>
+            Step {step} of {SETUP_STEPS}
+          </Text>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
 
-      <Body {...bodyProps}>{children}</Body>
+        <Body {...bodyProps}>{children}</Body>
 
-      <View style={styles.footer}>{footer}</View>
+        <View style={styles.footer}>{footer}</View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -148,7 +155,7 @@ export function SetupGenderScreen({
 
 /* -------------------------------------- 3. Blood group */
 
-const BLOOD = ["A+", "A−", "B+", "B−", "AB+", "AB−", "O+", "O−", "Unknown"];
+const BLOOD = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"];
 
 export function SetupBloodScreen({
   state = "empty",
@@ -301,16 +308,42 @@ export function SetupContactsScreen({
     fetchDeviceContacts,
     pickNativeContact,
     addContact,
+    updateContact,
     removeContact,
-    toggleContact,
     isMaxReached,
-  } = useEmergencyContacts(initial);
+  } = useEmergencyContacts(initial, { skipProfileFetch: !state });
 
-  // If state was explicitly passed (e.g., in legacy component tests), consider permission granted
   const effectivePermission = state ? "granted" : permissionStatus;
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsMode, setDetailsMode] = useState<"add" | "edit">("add");
+  const [pendingContact, setPendingContact] = useState<PhoneContact | null>(null);
+
+  const openAddDetails = (contact: PhoneContact) => {
+    setPendingContact({ ...contact, priority: nextAvailablePriority(contacts) });
+    setDetailsMode("add");
+    setDetailsOpen(true);
+    setSheetOpen(false);
+  };
+
+  const openEditDetails = (contact: PhoneContact) => {
+    setPendingContact(contact);
+    setDetailsMode("edit");
+    setDetailsOpen(true);
+  };
+
+  const handleSaveDetails = async (relation: string, priority: number) => {
+    if (!pendingContact) return;
+    if (detailsMode === "add") {
+      await addContact(pendingContact, relation, priority);
+    } else {
+      await updateContact(pendingContact.id, { relation, priority });
+    }
+    setDetailsOpen(false);
+    setPendingContact(null);
+  };
 
   const handleSelectContacts = async () => {
     if (effectivePermission !== "granted") {
@@ -320,14 +353,12 @@ export function SetupContactsScreen({
       }
     }
 
-    // Try native contact picker first
     const picked = await pickNativeContact();
     if (picked) {
-      await addContact(picked);
+      openAddDetails(picked);
       return;
     }
 
-    // Fall back to opening contacts sheet with device/fallback contacts
     await fetchDeviceContacts();
     setSheetOpen(true);
   };
@@ -349,17 +380,18 @@ export function SetupContactsScreen({
   return (
     <SetupShell
       step={5}
-      title="Who should we call?"
-      subtitle="Choose trusted emergency contacts who will be notified during an emergency."
+      title="Choose trusted contacts"
+      subtitle="People you'd want alerted the second something goes wrong."
       onBack={onBack}
-      onSkip={onSkip || onNext}
-      scroll
+      onSkip={onSkip}
       footer={
         <>
           <AppButton disabled={contacts.length === 0} onPress={onNext}>
             Continue
           </AppButton>
-          <Text style={styles.contactsCaption}>{contacts.length}/5 contacts added</Text>
+          {contacts.length > 0 ? (
+            <Text style={styles.contactsCaption}>{contacts.length}/5 contacts added</Text>
+          ) : null}
         </>
       }
     >
@@ -381,15 +413,11 @@ export function SetupContactsScreen({
         />
       ) : contacts.length === 0 ? (
         <EmptyState
-          illustration={<UserRound color={colors.primary} size={36} strokeWidth={1.4} />}
+          illustration={<UserRound color={colors.primary} size={40} strokeWidth={1.5} />}
           title="No contacts yet"
           body="Choose trusted emergency contacts who will be notified during an emergency."
           action={
-            <AppButton
-              size="md"
-              leading={<Plus size={18} color={colors.primaryForeground} />}
-              onPress={handleSelectContacts}
-            >
+            <AppButton size="md" leading={<Plus size={18} color={colors.primaryForeground} />} onPress={handleSelectContacts}>
               Select Emergency Contacts
             </AppButton>
           }
@@ -401,17 +429,26 @@ export function SetupContactsScreen({
               key={c.id}
               icon={<Text style={styles.contactInitials}>{c.initials}</Text>}
               title={c.name}
-              subtitle={`${c.relation} · ${c.phone}`}
-              trailing={<Trash2 size={18} color={`${colors.mutedForeground}b3`} />}
-              onPress={() => removeContact(c.id)}
+              subtitle={formatContactSubtitle(c)}
+              onPress={() => openEditDetails(c)}
+              trailing={
+                <Pressable
+                  accessibilityLabel="Remove contact"
+                  accessibilityRole="button"
+                  onPress={() => removeContact(c.id)}
+                  hitSlop={8}
+                >
+                  <Trash2 size={18} color={`${colors.mutedForeground}b3`} />
+                </Pressable>
+              }
             />
           ))}
           {isMaxReached ? (
             <Text style={styles.contactsMax}>You've reached the maximum of 5 contacts.</Text>
           ) : (
-            <Pressable onPress={handleOpenSheet} style={styles.contactsAdd}>
+            <Pressable onPress={handleSelectContacts} style={styles.contactsAdd}>
               <Plus size={18} color={colors.primary} />
-              <Text style={styles.contactsAddText}>Import from contacts</Text>
+              <Text style={styles.contactsAddText}>Add a contact</Text>
             </Pressable>
           )}
         </View>
@@ -438,7 +475,14 @@ export function SetupContactsScreen({
                 title={c.name}
                 subtitle={c.phone}
                 selected={picked}
-                onPress={() => toggleContact(c)}
+                onPress={() => {
+                  if (picked) {
+                    const existing = contacts.find((x) => x.id === c.id || (x.phone && x.phone === c.phone));
+                    if (existing) openEditDetails(existing);
+                  } else {
+                    openAddDetails(c);
+                  }
+                }}
                 trailing={
                   <View style={[styles.checkCircle, picked ? styles.checkCirclePicked : styles.checkCircleIdle]}>
                     {picked ? <Check size={16} color={colors.background} /> : null}
@@ -449,6 +493,18 @@ export function SetupContactsScreen({
           })
         )}
       </BottomSheet>
+
+      <ContactDetailsSheet
+        open={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setPendingContact(null);
+        }}
+        contact={pendingContact}
+        mode={detailsMode}
+        existingContacts={contacts}
+        onSave={handleSaveDetails}
+      />
     </SetupShell>
   );
 }
@@ -463,7 +519,7 @@ export function SetupMedicalScreen({
 }: {
   state?: "empty" | "filled";
   onBack?: () => void;
-  onNext?: () => void;
+  onNext?: (medicalInfo: { allergies: string; conditions: string; notes: string }) => void;
   onSkip?: () => void;
 }) {
   const filled = state === "filled";
@@ -474,12 +530,12 @@ export function SetupMedicalScreen({
   return (
     <SetupShell
       step={6}
-      title="Medical Setup"
-      subtitle="Optional medical details for responders."
+      title="Medical information"
+      subtitle="Optional, but it can save minutes when every second counts."
       onBack={onBack}
       onSkip={onSkip}
       scroll
-      footer={<AppButton onPress={onNext}>Continue</AppButton>}
+      footer={<AppButton onPress={() => onNext?.({ allergies, conditions, notes })}>Continue</AppButton>}
     >
       <View style={styles.medicalStack}>
         <View>
@@ -528,6 +584,7 @@ export function SetupCompleteScreen({ onDone }: { onDone?: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   skip: { paddingRight: 8, fontSize: 15, fontWeight: "500", color: colors.mutedForeground },
   header: { paddingHorizontal: 32, paddingTop: 4 },
   stepCaption: { marginTop: 12, fontSize: 13, fontWeight: "500", letterSpacing: 0.52, textTransform: "uppercase", color: colors.mutedForeground },

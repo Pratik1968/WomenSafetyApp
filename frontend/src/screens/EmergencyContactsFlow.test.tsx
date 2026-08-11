@@ -67,12 +67,21 @@ describe("Emergency Contacts Flow", () => {
     });
 
     expect(Contacts.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(await view.findByText("Contact details")).toBeTruthy();
+    expect(view.getByText("Priya Sharma")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(view.getByText("Add contact"));
+    });
+
     expect(await view.findByText("Priya Sharma")).toBeTruthy();
     expect(view.getByText("1/5 contacts added")).toBeTruthy();
 
     const saved = await contactStorageService.getStoredEmergencyContacts();
     expect(saved.length).toBe(1);
     expect(saved[0].name).toBe("Priya Sharma");
+    expect(saved[0].relation).toBe("FRIEND");
+    expect(saved[0].priority).toBe(1);
   });
 
   test("Shows friendly explanation with 'Try Again' and 'Skip for Now' options when permission is denied", async () => {
@@ -124,6 +133,12 @@ describe("Emergency Contacts Flow", () => {
     });
 
     expect(Contacts.requestPermissionsAsync).toHaveBeenCalledTimes(2);
+    expect(await view.findByText("Contact details")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(view.getByText("Add contact"));
+    });
+
     expect(await view.findByText("Rahul Kumar")).toBeTruthy();
   });
 });

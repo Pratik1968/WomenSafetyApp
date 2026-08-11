@@ -11,7 +11,7 @@ test("shows Skip and 'Continue' on a non-last step, calling the right handlers",
   await render(<OnboardingScreen step={0} onNext={onNext} onSkip={onSkip} />);
 
   await act(async () => {
-    fireEvent.press(screen.getByText(/Skip/i));
+    fireEvent.press(screen.getByText("Skip"));
   });
   expect(onSkip).toHaveBeenCalledTimes(1);
 
@@ -25,7 +25,7 @@ test("hides Skip and shows 'Get started' on the last step", async () => {
   const onNext = jest.fn();
   await render(<OnboardingScreen step={2} onNext={onNext} />);
 
-  expect(screen.queryByText(/Skip/i)).toBeNull();
+  expect(screen.queryByText("Skip")).toBeNull();
   await act(async () => {
     fireEvent.press(screen.getByText("Get started"));
   });
