@@ -3,6 +3,8 @@
  * Dynamically resolves API base URL purely from environment variables.
  */
 
+import { Platform } from 'react-native';
+
 export const getBaseUrl = (): string => {
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -11,8 +13,12 @@ export const getBaseUrl = (): string => {
     return envApiUrl;
   }
 
-  console.warn('[apiConfig] Warning: EXPO_PUBLIC_API_URL or EXPO_PUBLIC_API_BASE_URL is not configured in .env file.');
-  return '';
+  // Fallback for local development when .env is not set:
+  // Android Emulator uses 10.0.2.2 to reach host machine localhost.
+  // iOS Simulator & Web use localhost.
+  const defaultHost = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+  console.warn(`[apiConfig] EXPO_PUBLIC_API_URL not set in .env. Using local default → ${defaultHost}`);
+  return defaultHost;
 };
 
 export const API_CONFIG = {
