@@ -1,4 +1,4 @@
-// Incident data access — talks to the `emergency-service` edge function.
+// Incident data access — talks to the `incident-report-service` edge function.
 import { callFn } from "./functions";
 import type { Incident, IncidentType } from "./models";
 
@@ -11,9 +11,9 @@ export interface CreateIncidentInput {
 }
 
 export function createIncident(input: CreateIncidentInput): Promise<Incident> {
-  return callFn<{ incident: Incident }>(`emergency-service/incidents`, { method: "POST", body: input }).then((r) => r.incident);
+  return callFn<{ incident: Incident }>(`incident-report-service/incidents`, { method: "POST", body: input }).then((r) => r.incident);
 }
 
 export function listIncidents(): Promise<Incident[]> {
-  return callFn<{ incidents: Incident[] }>(`emergency-service/incidents`).then((r) => r.incidents);
+  return callFn<{ incidents: Incident[] }>(`incident-report-service/incidents`).then((r) => r.incidents);
 }

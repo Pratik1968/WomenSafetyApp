@@ -1,4 +1,5 @@
-// Module #17 data access — talks to the `emergency-service` edge function.
+// Module #17 data access — reads/manages evidence via `emergency-service`; uploads go through
+// the `storage` edge function (POST /evidence/upload-url and finalize).
 import * as FileSystem from "expo-file-system/legacy";
 import * as Crypto from "expo-crypto";
 import { decode } from "base64-arraybuffer";
@@ -29,7 +30,7 @@ export function requestUploadUrl(input: {
   mime_type?: string;
   incident_id?: string;
 }): Promise<{ evidence_id: string; path: string; token: string; signedUrl: string }> {
-  return callFn(`emergency-service/evidence/upload-url`, { method: "POST", body: input });
+  return callFn(`storage/evidence/upload-url`, { method: "POST", body: input });
 }
 
 export function finalizeEvidence(input: {
@@ -40,7 +41,7 @@ export function finalizeEvidence(input: {
   captured_at?: string;
   tamper_seal?: string;
 }): Promise<Evidence> {
-  return callFn<{ evidence: Evidence }>(`emergency-service/evidence`, { method: "POST", body: input }).then((r) => r.evidence);
+  return callFn<{ evidence: Evidence }>(`storage/evidence`, { method: "POST", body: input }).then((r) => r.evidence);
 }
 
 export function deleteEvidence(id: string): Promise<void> {
