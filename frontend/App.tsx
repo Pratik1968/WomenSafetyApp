@@ -1,3 +1,4 @@
+import { LogBox } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { RootStack } from "./src/navigation/RootStack";
 import {
@@ -7,6 +8,9 @@ import {
   AIProvider,
   JourneyProvider,
 } from "./src/context";
+
+// Suppress on-screen developer warning/error toast overlays in demo/user UI
+LogBox.ignoreAllLogs(true);
 
 export default function App() {
   return (

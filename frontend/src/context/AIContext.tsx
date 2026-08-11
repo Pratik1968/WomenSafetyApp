@@ -7,7 +7,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AIMessage, AIAssistantState, AISafetyIntent, AIConversationSession } from '../modules/ai/types/ai.types';
+import { AIMessage, AIAssistantState, AISafetyIntent } from '../modules/ai/types/ai.types';
 import { aiService } from '../modules/ai/services/aiService';
 import { firebaseAuthService } from '../infrastructure/auth/firebaseAuthService';
 import { useVoiceState } from './VoiceContext';
@@ -50,7 +50,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     const unsub = networkMonitor.onNetworkChange((online) => {
       setIsOnline(online);
-      setNetworkError(online ? null : 'Aegis Backend Offline — Request queued for auto-retry.');
+      setNetworkError(online ? null : 'Backend Offline — Request queued for auto-retry.');
     });
     return () => unsub();
   }, []);
@@ -111,7 +111,6 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       setCurrentIntent(result.assistantMessage.intent || 'NORMAL_CHAT');
       setAssistantState('SPEAKING');
 
-      // Return to idle after speech response completes
       setTimeout(() => setAssistantState('IDLE'), 2000);
     } catch (err) {
       logger.error('Failed to process voice query:', err);

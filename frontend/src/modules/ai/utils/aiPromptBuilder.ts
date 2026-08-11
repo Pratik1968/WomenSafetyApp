@@ -1,5 +1,5 @@
 /**
- * Prompt Engineering & History Formatting Utilities for Gemini Integration
+ * Prompt Engineering & History Formatting Utilities for AI Integration
  * Supports Location Context (GPS, Nearest Police Station, Nearest Hospital, Emergency Contacts Count)
  */
 

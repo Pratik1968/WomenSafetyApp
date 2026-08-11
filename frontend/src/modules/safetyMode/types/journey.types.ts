@@ -41,7 +41,6 @@ export interface JourneyConfig {
 
 /** A single emergency event that occurred during an active journey */
 export interface JourneyEmergencyEvent {
-  /** Stable ID linking this event to the EmergencyService record */
   emergencyId: string;
   journeyId: string;
   detectedKeyword: string;

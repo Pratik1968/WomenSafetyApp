@@ -20,7 +20,7 @@ export function handleApiError(error: unknown): FormattedApiError {
 
     // Timeout Error
     if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
-      logger.error('API Request Timeout');
+      logger.warn('API Request Timeout');
       return {
         code: 'TIMEOUT',
         message: 'Request timed out. Please check your network connection and try again.',
@@ -31,10 +31,10 @@ export function handleApiError(error: unknown): FormattedApiError {
 
     // No Internet / Network Failure
     if (!axiosError.response) {
-      logger.error('API Network Failure / Server Down:', axiosError.message);
+      logger.info('API Network Failure / Backend server unreachable:', axiosError.message);
       return {
         code: 'NETWORK_ERROR',
-        message: 'Unable to reach Aegis servers. Please verify internet connection.',
+        message: 'Unable to reach backend servers. Please verify internet connection.',
         isNetworkError: true,
         isTimeout: false,
       };
@@ -76,7 +76,7 @@ export function handleApiError(error: unknown): FormattedApiError {
         return {
           code: 'SERVER_ERROR',
           status,
-          message: serverMessage || 'Aegis backend is currently unavailable. Using offline safety fallback.',
+          message: serverMessage || 'Backend service is currently unavailable. Using offline safety fallback.',
           isNetworkError: true,
           isTimeout: false,
         };

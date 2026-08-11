@@ -7,6 +7,7 @@ export * from './types/voice.types';
 export * from './types/voiceRecognition.types';
 export * from './services/voicePermissions';
 export * from './services/voiceRecognitionService';
+export * from './services/safetyForegroundBridge';
 export * from './services/aiVoiceModelService';
 export * from './hooks/useVoiceRecognition';
 export * from './hooks/useVoiceSpeech';

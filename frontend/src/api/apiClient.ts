@@ -1,6 +1,6 @@
 /**
  * Central Production Axios API Client Instance
- * Configured with Base URL, 10s Timeout, Firebase Auth Interceptors,
+ * Configured with Base URL, 10s Timeout, Auth Interceptors,
  * Detailed Request/Response Logging, Response Error Formatters, and Retry Strategy.
  */
 
@@ -23,7 +23,7 @@ export const apiClient: AxiosInstance = axios.create({
   headers: API_CONFIG.headers,
 });
 
-// Request Interceptor: Attach Firebase ID Token and Log Request Metadata
+// Request Interceptor: Attach Auth ID Token and Log Request Metadata
 apiClient.interceptors.request.use(
   async (config: CustomAxiosRequestConfig) => {
     config.metadata = { startTime: Date.now() };
@@ -36,7 +36,7 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (err) {
-      logger.warn('Failed to retrieve Firebase ID Token for request:', err);
+      logger.warn('Failed to retrieve Auth ID Token for request:', err);
     }
     return config;
   },
