@@ -18,6 +18,8 @@ export function AppInput({
   secureTextEntry,
   maxLength,
   editable = true,
+  secureTextEntry,
+  autoCapitalize,
 }: {
   value: string;
   onChangeText: (text: string) => void;
@@ -30,6 +32,8 @@ export function AppInput({
   secureTextEntry?: boolean;
   maxLength?: number;
   editable?: boolean;
+  secureTextEntry?: boolean;
+  autoCapitalize?: ComponentProps<typeof TextInput>["autoCapitalize"];
 }) {
   const [focused, setFocused] = useState(false);
 
@@ -57,6 +61,8 @@ export function AppInput({
           secureTextEntry={secureTextEntry}
           maxLength={maxLength}
           editable={editable}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={styles.input}

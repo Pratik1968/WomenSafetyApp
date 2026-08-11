@@ -12,7 +12,8 @@
       "backgroundColor": "#090A0F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.womensafty.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,11 +39,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
-          "isAndroidBackgroundLocationEnabled": true
+          "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident."
         }
-      ],
-      "expo-notifications"
+      ]
     ]
   }
 }

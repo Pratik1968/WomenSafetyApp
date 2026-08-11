@@ -54,15 +54,20 @@ export type RootStackParamList = {
   NearbyHelp: undefined;
   Assistant: undefined;
   Report: undefined;
+  CommunityReports: undefined;
   Notifications: undefined;
-  Settings: undefined;
-  DataPrivacy: undefined;
-  ManageContacts: undefined;
-  IncidentDetail: undefined;
   HomeStub: undefined;
+  NewIncident: undefined;
+  IncidentDetail: { id?: string } | undefined;
+  UploadEvidence: { incidentId?: string } | undefined;
+  EvidenceDetail: { id?: string } | undefined;
+  AdminDashboard: undefined;
+  AdminUsers: undefined;
+  AdminIncidents: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+type P<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
 
 function SplashRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Splash">) {
   useEffect(() => {
@@ -295,105 +300,230 @@ function HomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamLi
         else if (t === "history") navigation.navigate("History");
         else if (t === "profile") navigation.navigate("Profile");
       }}
+      onSos={() => navigation.navigate("Sos")}
+      onAssistant={() => navigation.navigate("Assistant")}
+      links={[
+        { label: "Notifications", onPress: () => navigation.navigate("Notifications") },
+        { label: "Safe Route", onPress: () => navigation.navigate("SafeRoute") },
+        { label: "Nearby Help", onPress: () => navigation.navigate("NearbyHelp") },
+        { label: "Report Area", onPress: () => navigation.navigate("Report") },
+      ]}
     />
   );
 }
-
-function SafetyRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Safety">) {
+function SafetyRoute({ navigation }: P<"Safety">) {
   return (
-    <SafetyScreen
-      onTab={(t: TabKey) => {
+    <PlaceholderScreen
+      title="Safety"
+      tab="safety"
+      onTab={(t) => {
         if (t === "home") navigation.navigate("Home");
         else if (t === "history") navigation.navigate("History");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onSafetyMode={() => navigation.navigate("Home")}
-      onSafeRoute={() => navigation.navigate("SafeRoute")}
-      onNearby={() => navigation.navigate("NearbyHelp")}
-      onContacts={() => navigation.navigate("Profile")}
+      onSos={() => navigation.navigate("Sos")}
       onAssistant={() => navigation.navigate("Assistant")}
-      onSos={() => navigation.navigate("Sos", { state: "active" })}
+      links={[
+        { label: "Safe Route", onPress: () => navigation.navigate("SafeRoute") },
+        { label: "Nearby Help", onPress: () => navigation.navigate("NearbyHelp") },
+        { label: "Report Area", onPress: () => navigation.navigate("Report") },
+      ]}
     />
   );
 }
-
-function HistoryRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "History">) {
+function ProfileRoute({ navigation }: P<"Profile">) {
   return (
-    <HistoryScreen
+    <PlaceholderScreen
+      title="Profile"
+      tab="profile"
+      onTab={(t) => {
+        if (t === "home") navigation.navigate("Home");
+        else if (t === "safety") navigation.navigate("Safety");
+        else if (t === "history") navigation.navigate("History");
+      }}
+      onSos={() => navigation.navigate("Sos")}
+      onAssistant={() => navigation.navigate("Assistant")}
+      links={[
+        { label: "Settings", onPress: () => navigation.navigate("Settings") },
+        { label: "Data & Privacy", onPress: () => navigation.navigate("DataPrivacy") },
+      ]}
+    />
+  );
+}
+function SettingsRoute({ navigation }: P<"Settings">) {
+  return <PlaceholderScreen title="Settings" onBack={() => navigation.goBack()} links={[{ label: "Data & Privacy", onPress: () => navigation.navigate("DataPrivacy") }]} />;
+}
+function DataPrivacyRoute({ navigation }: P<"DataPrivacy">) {
+  return <PlaceholderScreen title="Data & Privacy" onBack={() => navigation.goBack()} />;
+}
+function SosRoute({ navigation }: P<"Sos">) {
+  return <PlaceholderScreen title="SOS" onBack={() => navigation.goBack()} links={[{ label: "Done", onPress: () => navigation.replace("Home") }]} />;
+}
+function SafeRouteRoute({ navigation }: P<"SafeRoute">) {
+  return <PlaceholderScreen title="Safe Route" onBack={() => navigation.goBack()} />;
+}
+function NearbyHelpRoute({ navigation }: P<"NearbyHelp">) {
+  return <PlaceholderScreen title="Nearby Help" onBack={() => navigation.goBack()} />;
+}
+function AssistantRoute({ navigation }: P<"Assistant">) {
+  return <PlaceholderScreen title="AI Assistant" onBack={() => navigation.goBack()} />;
+}
+function NotificationsRoute({ navigation }: P<"Notifications">) {
+  return <PlaceholderScreen title="Notifications" onBack={() => navigation.goBack()} />;
+}
+function HomeStubRoute({ navigation }: P<"HomeStub">) {
+  return <PlaceholderScreen title="Home (stub)" onBack={() => navigation.goBack()} />;
+}
+
+// ---------- History tab → REAL incidents module ----------
+function HistoryRoute({ navigation }: P<"History">) {
+  return (
+    <IncidentsScreen
       onTab={(t: TabKey) => {
         if (t === "home") navigation.navigate("Home");
         else if (t === "safety") navigation.navigate("Safety");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onOpen={() => navigation.navigate("IncidentDetail")}
+      onOpen={(id) => navigation.navigate("IncidentDetail", { id })}
+      onNew={() => navigation.navigate("NewIncident")}
       onAssistant={() => navigation.navigate("Assistant")}
-      onSos={() => navigation.navigate("Sos", { state: "active" })}
+      onSos={() => navigation.navigate("Sos")}
     />
   );
 }
 
-function ProfileRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Profile">) {
+// ---------- real incident/evidence routes ----------
+function NewIncidentRoute({ navigation }: P<"NewIncident">) {
+  return <NewIncidentScreen onBack={() => navigation.goBack()} onCreated={(id) => navigation.replace("IncidentDetail", { id })} />;
+}
+function IncidentDetailRoute({ navigation, route }: P<"IncidentDetail">) {
   return (
-    <ProfileScreen
-      onTab={(t: TabKey) => {
-        if (t === "home") navigation.navigate("Home");
-        else if (t === "safety") navigation.navigate("Safety");
-        else if (t === "history") navigation.navigate("History");
-      }}
-      onSettings={() => navigation.navigate("Settings")}
-      onPrivacy={() => navigation.navigate("DataPrivacy")}
-      onAssistant={() => navigation.navigate("Assistant")}
-      onSos={() => navigation.navigate("Sos", { state: "active" })}
-      onManageContacts={() => navigation.navigate("ManageContacts")}
-      onLoggedOut={() => navigation.reset({ index: 0, routes: [{ name: "Welcome" }] })}
+    <IncidentDetailScreen
+      id={route.params?.id}
+      onBack={() => navigation.goBack()}
+      onOpenEvidence={(eid) => navigation.navigate("EvidenceDetail", { id: eid })}
+      onAddEvidence={(incidentId) => navigation.navigate("UploadEvidence", { incidentId })}
     />
   );
 }
-
-function ManageContactsRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "ManageContacts">) {
-  return <ManageContactsScreen onBack={() => navigation.goBack()} />;
+function UploadEvidenceRoute({ navigation, route }: P<"UploadEvidence">) {
+  return <UploadEvidenceScreen incidentId={route.params?.incidentId} onBack={() => navigation.goBack()} onDone={() => navigation.goBack()} />;
+}
+function EvidenceDetailRoute({ navigation, route }: P<"EvidenceDetail">) {
+  return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
 }
 
-function SosRouteScreen({ navigation, route }: NativeStackScreenProps<RootStackParamList, "Sos">) {
-  const sosState = route.params?.state ?? "active";
+// ---------- module #12: crowd-sourced incident reporting ----------
+function ReportRoute({ navigation }: P<"Report">) {
   return (
-    <SosScreen
-      state={sosState}
-      onEnd={() => navigation.setParams({ state: "confirm" })}
-      onCancelConfirm={() => navigation.setParams({ state: "cancelled" })}
-      onDone={() => navigation.replace("Home")}
+    <ReportScreen
+      onBack={() => navigation.goBack()}
+      onSubmitDone={() => navigation.replace("Home")}
+      onViewCommunity={() => navigation.replace("CommunityReports")}
     />
+  );
+}
+function CommunityReportsRoute({ navigation }: P<"CommunityReports">) {
+  return <CommunityReportsScreen onBack={() => navigation.goBack()} onReportNew={() => navigation.navigate("Report")} />;
+}
+
+// ---------- admin routes (web-gated in the screens) ----------
+function AdminDashboardRoute({ navigation }: P<"AdminDashboard">) {
+  return (
+    <AdminDashboardScreen
+      onBack={() => navigation.goBack()}
+      onUsers={() => navigation.navigate("AdminUsers")}
+      onIncidents={() => navigation.navigate("AdminIncidents")}
+    />
+  );
+}
+function AdminUsersRoute({ navigation }: P<"AdminUsers">) {
+  return <AdminUsersScreen onBack={() => navigation.goBack()} />;
+}
+function AdminIncidentsRoute({ navigation }: P<"AdminIncidents">) {
+  return <AdminIncidentsScreen onBack={() => navigation.goBack()} />;
+}
+
+// ---------- web: admin console only ----------
+// On the web the app IS the admin console — the mobile safety flows (splash/onboarding/home/
+// incidents/evidence/…) are not registered here, so those routes simply don't exist on web.
+// The dashboard is the root, so it has no back button; AdminUsers/AdminIncidents are pushed on top.
+function WebAdminNavigator({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <Stack.Navigator initialRouteName="AdminDashboard" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AdminDashboard">
+        {({ navigation }: P<"AdminDashboard">) => (
+          <AdminDashboardScreen
+            onUsers={() => navigation.navigate("AdminUsers")}
+            onIncidents={() => navigation.navigate("AdminIncidents")}
+            onSignOut={onSignOut}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="AdminUsers" component={AdminUsersRoute} />
+      <Stack.Screen name="AdminIncidents" component={AdminIncidentsRoute} />
+    </Stack.Navigator>
+  );
+}
+
+function WebAdminApp() {
+  // Auth gate against admin_users. `authed === null` while we restore any persisted session so a
+  // signed-in operator isn't flashed the login form on refresh.
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadAdminSession().then((ok) => alive && setAuthed(ok));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (authed === null) return null;
+  if (!authed) return <AdminAuthScreen onAuthed={() => setAuthed(true)} />;
+  return (
+    <NavigationContainer>
+      <WebAdminNavigator onSignOut={() => void adminLogout().then(() => setAuthed(false))} />
+    </NavigationContainer>
+  );
+}
+
+// ---------- native: the full mobile safety app ----------
+function MobileApp() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Splash" component={SplashRoute} />
+        <Stack.Screen name="Onboarding" component={OnboardingRoute} />
+        <Stack.Screen name="Welcome" component={WelcomeRoute} />
+        <Stack.Screen name="Phone" component={PhoneRoute} />
+        <Stack.Screen name="Otp" component={OtpRoute} />
+        <Stack.Screen name="Setup" component={SetupRoute} />
+        <Stack.Screen name="Permissions" component={PermissionsRoute} />
+        <Stack.Screen name="Home" component={HomeRoute} options={{ animation: "none" }} />
+        <Stack.Screen name="Safety" component={SafetyRoute} options={{ animation: "none" }} />
+        <Stack.Screen name="History" component={HistoryRoute} options={{ animation: "none" }} />
+        <Stack.Screen name="Profile" component={ProfileRoute} options={{ animation: "none" }} />
+        <Stack.Screen name="Settings" component={SettingsRoute} />
+        <Stack.Screen name="DataPrivacy" component={DataPrivacyRoute} />
+        <Stack.Screen name="Sos" component={SosRoute} />
+        <Stack.Screen name="SafeRoute" component={SafeRouteRoute} />
+        <Stack.Screen name="NearbyHelp" component={NearbyHelpRoute} />
+        <Stack.Screen name="Assistant" component={AssistantRoute} />
+        <Stack.Screen name="Report" component={ReportRoute} />
+        <Stack.Screen name="CommunityReports" component={CommunityReportsRoute} />
+        <Stack.Screen name="Notifications" component={NotificationsRoute} />
+        <Stack.Screen name="HomeStub" component={HomeStubRoute} />
+        <Stack.Screen name="NewIncident" component={NewIncidentRoute} />
+        <Stack.Screen name="IncidentDetail" component={IncidentDetailRoute} />
+        <Stack.Screen name="UploadEvidence" component={UploadEvidenceRoute} />
+        <Stack.Screen name="EvidenceDetail" component={EvidenceDetailRoute} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardRoute} />
+        <Stack.Screen name="AdminUsers" component={AdminUsersRoute} />
+        <Stack.Screen name="AdminIncidents" component={AdminIncidentsRoute} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
 export function RootStack() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Splash" component={SplashRouteScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingRouteScreen} />
-        <Stack.Screen name="Welcome" component={WelcomeRouteScreen} />
-        <Stack.Screen name="Login" component={LoginRouteScreen} />
-        <Stack.Screen name="Phone" component={PhoneRouteScreen} />
-        <Stack.Screen name="Otp" component={OtpRouteScreen} />
-        <Stack.Screen name="Setup" component={SetupRouteScreen} />
-        <Stack.Screen name="Permissions" component={PermissionsRouteScreen} />
-        <Stack.Screen name="Home" component={HomeRouteScreen} />
-        <Stack.Screen name="Safety" component={SafetyRouteScreen} />
-        <Stack.Screen name="History" component={HistoryRouteScreen} />
-        <Stack.Screen name="Profile" component={ProfileRouteScreen} />
-        <Stack.Screen name="Sos" component={SosRouteScreen} />
-        <Stack.Screen name="SafeRoute" component={SafeRouteScreen} />
-        <Stack.Screen name="NearbyHelp" component={NearbyHelpScreen} />
-        <Stack.Screen name="Assistant" component={AssistantScreen} />
-        <Stack.Screen name="Report" component={ReportScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
-        <Stack.Screen name="ManageContacts" component={ManageContactsRouteScreen} />
-        <Stack.Screen name="IncidentDetail" component={IncidentDetailScreen} />
-        <Stack.Screen name="HomeStub" component={HomeStubScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  return Platform.OS === "web" ? <WebAdminApp /> : <MobileApp />;
 }
