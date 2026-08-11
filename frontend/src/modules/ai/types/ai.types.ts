@@ -32,6 +32,7 @@ export interface AIMessage {
     locationContext?: AILocationContext;
     detectedKeyword?: string;
     suggestedActions?: string[];
+    directionsUrl?: string;
   };
 }
 

@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIConversationSession } from '../types/ai.types';
 import { logger } from '../../../utils/logger';
 
-const STORAGE_PREFIX = '@aegis_ai_conversation_';
+const STORAGE_PREFIX = '@womensafty_ai_conversation_';
 
 export class ConversationRepository {
   private static instance: ConversationRepository;

@@ -1,15 +1,17 @@
 /**
  * Reusable AI Voice Recognition Service
- * Built on expo-speech-recognition architecture (Expo Managed CNG Workflow).
+ * Built on expo-speech-recognition architecture (Expo Managed CNG Workflow) with native Android SafetyForegroundService bridge.
  * Handles Speech-to-Text lifecycle, multi-language switching (English, Telugu, Hindi), partial transcript streaming, and mic energy.
  */
 
+import { Platform } from 'react-native';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import {
   SpeechRecognitionState,
   SupportedLanguage,
 } from '../types/voiceRecognition.types';
 import { requestMicrophonePermissions } from './voicePermissions';
+import { safetyForegroundBridge } from './safetyForegroundBridge';
 import { HardwareError } from '../../../errors/AppError';
 import { logger } from '../../../utils/logger';
 
@@ -21,6 +23,8 @@ export class VoiceRecognitionService {
   private recognizedText: string = '';
   private partialText: string = '';
   private volumeLevel: number = 0; // 0 to 10
+  private isContinuousMonitoring: boolean = false;
+  private restartTimeout: any = null;
 
   private stateListeners: Set<(state: SpeechRecognitionState) => void> = new Set();
   private textListeners: Set<(text: string, partial: string) => void> = new Set();
@@ -30,11 +34,9 @@ export class VoiceRecognitionService {
   private subscriptions: Array<{ remove: () => void }> = [];
 
   private constructor() {
-    logger.info('VoiceRecognitionService initialized with expo-speech-recognition.');
-    // Native event listeners are bound lazily in startListening() (which already
-    // rebinds on every call) so merely importing this module doesn't touch the
-    // native ExpoSpeechRecognition module — matters for environments (tests) where
-    // it isn't available.
+    logger.info('VoiceRecognitionService initialized with expo-speech-recognition and native safety bridge.');
+    this.bindVoiceEvents();
+    this.bindNativeForegroundBridgeEvents();
   }
 
   public static getInstance(): VoiceRecognitionService {
@@ -45,7 +47,30 @@ export class VoiceRecognitionService {
   }
 
   /**
-   * Bind expo-speech-recognition lifecycle event listeners
+   * Listen to native Android foreground service speech recognition transcripts
+   */
+  private bindNativeForegroundBridgeEvents(): void {
+    if (Platform.OS === 'android') {
+      safetyForegroundBridge.onVoiceTranscript((data) => {
+        logger.info(`[VoiceRecognitionService] Received transcript from native foreground service: "${data.transcript}" (final=${data.isFinal}, lang=${data.language})`);
+        if (data.language) {
+          this.currentLanguage = data.language as SupportedLanguage;
+        }
+        if (data.isFinal) {
+          this.recognizedText = data.transcript;
+          this.partialText = '';
+          this.updateState('SUCCESS');
+        } else {
+          this.partialText = data.transcript;
+          this.updateState('LISTENING');
+        }
+        this.notifyText();
+      });
+    }
+  }
+
+  /**
+   * Bind expo-speech-recognition lifecycle event listeners (for foreground single-shot and iOS)
    */
   private bindVoiceEvents(): void {
     this.clearSubscriptions();
@@ -67,6 +92,11 @@ export class VoiceRecognitionService {
         } else {
           this.updateState('IDLE');
         }
+
+        // Auto-restart on iOS or non-Android continuous mode
+        if (this.isContinuousMonitoring && Platform.OS !== 'android') {
+          this.scheduleAutoRestart(300);
+        }
       });
 
       const resultSub = ExpoSpeechRecognitionModule.addListener('result', (event: any) => {
@@ -76,12 +106,10 @@ export class VoiceRecognitionService {
           if (event.isFinal) {
             this.recognizedText = transcript;
             this.partialText = '';
-            console.log('Real speech recognizedText:', transcript);
             this.notifyText();
             this.updateState('SUCCESS');
           } else {
             this.partialText = transcript;
-            console.log('Real speech partialText:', transcript);
             this.notifyText();
           }
         }
@@ -90,11 +118,33 @@ export class VoiceRecognitionService {
       const errorSub = ExpoSpeechRecognitionModule.addListener('error', (event: any) => {
         logger.error('SpeechRecognition event: error', event);
         let errMsg = event.message || event.error || 'Speech recognition error occurred.';
-        if (event.error === 'network' || event.code === 11 || (typeof errMsg === 'string' && errMsg.includes('Server disconnected'))) {
+        const errCode = event.code;
+        const errStr = typeof errMsg === 'string' ? errMsg.toLowerCase() : '';
+
+        if (event.error === 'network' || errCode === 11 || errStr.includes('server disconnected')) {
           errMsg = 'Network error: Speech Recognition server disconnected. Please check your internet connection or enable offline Speech Recognition in Android Settings.';
         }
+
+        const isTransient =
+          event.error === 'no-match' ||
+          event.error === 'speech-timeout' ||
+          event.error === 'busy' ||
+          errCode === 7 ||
+          errCode === 6 ||
+          errCode === 8;
+
+        if (this.isContinuousMonitoring && isTransient && Platform.OS !== 'android') {
+          logger.info('[VoiceRecognitionService] Transient silence/timeout encountered. Auto-recovering...');
+          this.scheduleAutoRestart(400);
+          return;
+        }
+
         this.updateState('ERROR');
         this.notifyError(errMsg);
+
+        if (this.isContinuousMonitoring && !errStr.includes('permission denied') && Platform.OS !== 'android') {
+          this.scheduleAutoRestart(1000);
+        }
       });
 
       const volumeSub = ExpoSpeechRecognitionModule.addListener('volumechange', (event: any) => {
@@ -107,6 +157,25 @@ export class VoiceRecognitionService {
 
       this.subscriptions.push(startSub, endSub, resultSub, errorSub, volumeSub);
     }
+  }
+
+  private scheduleAutoRestart(delayMs: number = 300): void {
+    if (!this.isContinuousMonitoring) return;
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+    }
+    this.restartTimeout = setTimeout(async () => {
+      if (!this.isContinuousMonitoring) return;
+      try {
+        logger.info(`[VoiceRecognitionService] Auto-restarting continuous speech recognition in [${this.currentLanguage}]...`);
+        await this.startListening(this.currentLanguage, true);
+      } catch (err) {
+        logger.warn('[VoiceRecognitionService] Auto-restart attempt failed, will retry:', err);
+        if (this.isContinuousMonitoring) {
+          this.scheduleAutoRestart(1000);
+        }
+      }
+    }, delayMs);
   }
 
   private clearSubscriptions(): void {
@@ -129,33 +198,59 @@ export class VoiceRecognitionService {
   public setLanguage(language: SupportedLanguage): void {
     logger.info(`Setting Speech Recognition Language to [${language}]...`);
     this.currentLanguage = language;
+    if (Platform.OS === 'android') {
+      safetyForegroundBridge.updateLanguage(language).catch(() => {});
+    }
   }
 
   /**
    * Start speech recognition listening session
+   * @param locale Target language locale
+   * @param continuousBackground If true, automatically recovers and runs continuously in background safety mode
    */
-  public async startListening(locale?: SupportedLanguage): Promise<void> {
+  public async startListening(locale?: SupportedLanguage, continuousBackground: boolean = false): Promise<void> {
     const permResult = await requestMicrophonePermissions();
     if (!permResult.granted) {
+      this.isContinuousMonitoring = false;
       this.updateState('ERROR');
       this.notifyError(permResult.message || 'Microphone permission was denied.');
       throw new HardwareError(permResult.message || 'Microphone permission was denied.');
     }
 
-    console.log('Speech recognition starting...');
+    this.isContinuousMonitoring = continuousBackground;
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+
     const lang = locale || this.currentLanguage;
     this.currentLanguage = lang;
 
-    logger.info(`Starting Speech-to-Text Recognition via expo-speech-recognition in locale [${lang}]...`);
     this.recognizedText = '';
     this.partialText = '';
     this.notifyText();
     this.notifyError(null);
 
+    // On Android in continuous background safety mode, recognition runs directly inside SafetyForegroundService
+    if (Platform.OS === 'android' && continuousBackground) {
+      logger.info(`[VoiceRecognitionService] 🛡️ Delegating continuous background listening to native SafetyForegroundService in locale [${lang}]...`);
+      try {
+        await ExpoSpeechRecognitionModule.stop();
+      } catch (_err) {
+        // Safe ignore
+      }
+      await safetyForegroundBridge.updateLanguage(lang);
+      this.updateState('LISTENING');
+      return;
+    }
+
+    // Otherwise (foreground assistant / iOS), use ExpoSpeechRecognitionModule
+    logger.info(`Starting Speech-to-Text Recognition via expo-speech-recognition in locale [${lang}] (continuous: ${continuousBackground})...`);
+
     try {
       await ExpoSpeechRecognitionModule.stop();
     } catch (_err) {
-      // Ignore cleanup errors
+      // Safe ignore
     }
 
     try {
@@ -167,11 +262,13 @@ export class VoiceRecognitionService {
         volumeChangeEventOptions: { enabled: true, intervalMillis: 200 },
       });
       this.updateState('LISTENING');
-      console.log('Speech recognition started');
     } catch (err: any) {
       logger.error('Failed to start SpeechRecognition:', err);
       this.updateState('ERROR');
       this.notifyError(err.message || 'Failed to start speech recognition.');
+      if (this.isContinuousMonitoring && Platform.OS !== 'android') {
+        this.scheduleAutoRestart(1000);
+      }
       throw err;
     }
   }
@@ -181,6 +278,11 @@ export class VoiceRecognitionService {
    */
   public async stopListening(): Promise<void> {
     logger.info('Stopping speech recognition session...');
+    this.isContinuousMonitoring = false;
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
     try {
       await ExpoSpeechRecognitionModule.stop();
       this.updateState('PROCESSING');
@@ -194,39 +296,42 @@ export class VoiceRecognitionService {
    */
   public async cancelListening(): Promise<void> {
     logger.info('Cancelling speech recognition session...');
+    this.isContinuousMonitoring = false;
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
     try {
       await ExpoSpeechRecognitionModule.abort();
       this.recognizedText = '';
       this.partialText = '';
-      this.notifyText();
       this.updateState('IDLE');
+      this.notifyText();
     } catch (err) {
-      logger.error('Error aborting SpeechRecognition:', err);
+      logger.error('Error cancelling SpeechRecognition:', err);
     }
   }
 
   /**
-   * Destroy recognizer instance resources
+   * Clean up all recognizer resources and listeners
    */
-  public async destroyRecognizer(): Promise<void> {
+  public destroy(): void {
     logger.info('Destroying speech recognizer instance resources...');
-    try {
-      await ExpoSpeechRecognitionModule.abort();
-    } catch (err) {
-      logger.error('Error aborting SpeechRecognition:', err);
+    this.isContinuousMonitoring = false;
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
     }
     this.clearSubscriptions();
-    this.recognizedText = '';
-    this.partialText = '';
-    this.notifyText();
-    this.updateState('IDLE');
     this.stateListeners.clear();
     this.textListeners.clear();
     this.volumeListeners.clear();
     this.errorListeners.clear();
+    this.recognitionState = 'IDLE';
   }
 
-  // Event Subscription Handlers
+  // ─── Observer Pattern Event Subscriptions ─────────────────────────────────
+
   public onStateChange(listener: (state: SpeechRecognitionState) => void): () => void {
     this.stateListeners.add(listener);
     listener(this.recognitionState);
@@ -241,7 +346,6 @@ export class VoiceRecognitionService {
 
   public onVolumeChange(listener: (volume: number) => void): () => void {
     this.volumeListeners.add(listener);
-    listener(this.volumeLevel);
     return () => this.volumeListeners.delete(listener);
   }
 
@@ -250,17 +354,17 @@ export class VoiceRecognitionService {
     return () => this.errorListeners.delete(listener);
   }
 
-  private updateState(newState: SpeechRecognitionState): void {
-    this.recognitionState = newState;
-    this.stateListeners.forEach(l => l(this.recognitionState));
+  private updateState(state: SpeechRecognitionState): void {
+    this.recognitionState = state;
+    this.stateListeners.forEach(l => l(state));
   }
 
   private notifyText(): void {
     this.textListeners.forEach(l => l(this.recognizedText, this.partialText));
   }
 
-  private notifyError(errMsg: string | null): void {
-    this.errorListeners.forEach(l => l(errMsg));
+  private notifyError(err: string | null): void {
+    this.errorListeners.forEach(l => l(err));
   }
 }
 

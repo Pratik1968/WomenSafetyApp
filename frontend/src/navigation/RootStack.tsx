@@ -42,6 +42,7 @@ import { AdminAuthScreen } from "../screens/AdminAuthScreen";
 import { AdminDashboardScreen } from "../screens/AdminDashboardScreen";
 import { AdminUsersScreen } from "../screens/AdminUsersScreen";
 import { AdminIncidentsScreen } from "../screens/AdminIncidentsScreen";
+import { VoiceTriggerConfigScreen, VoiceTrainingScreen } from "../modules/voice";
 import { loadAdminSession, adminLogout } from "../data/adminAuth";
 import { type TabKey } from "../components/app/BottomNav";
 import { saveProfile, clearCurrentProfile } from "../services/profileService";
@@ -84,6 +85,8 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminIncidents: undefined;
+  VoiceTriggerConfig: undefined;
+  VoiceTraining: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -216,7 +219,7 @@ function SetupRouteScreen({ navigation }: P<"Setup">) {
       navigation.replace("Permissions");
     } catch (err: any) {
       setSaving(false);
-      console.warn("Could not save profile to Supabase:", err);
+      console.warn("Could not save profile to backend/database:", err);
       Alert.alert(
         "Couldn't save your profile",
         "We weren't able to reach the server to save your safety profile. Check your connection and try again.",
@@ -278,7 +281,7 @@ function SetupRouteScreen({ navigation }: P<"Setup">) {
           if (info?.allergies?.trim()) parts.push(`Allergies: ${info.allergies.trim()}`);
           if (info?.conditions?.trim()) parts.push(`Conditions: ${info.conditions.trim()}`);
           if (info?.notes?.trim()) parts.push(`Notes: ${info.notes.trim()}`);
-          profileData.current.medical_notes = parts.length > 0 ? parts.join(" · ") : undefined;
+          profileData.current.medical_notes = parts.length > 0 ? parts.join(" • ") : undefined;
           advanceTo("Done");
         }}
         onSkip={() => advanceTo("Done")}
@@ -314,6 +317,7 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Report Area") navigation.navigate("Report");
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
+        else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
       }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
@@ -359,7 +363,7 @@ function HistoryRouteScreen({ navigation }: P<"History">) {
         else if (t === "safety") navigation.navigate("Safety");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onOpen={(incidentId: string) => navigation.navigate("IncidentDetail", { incidentId })}
+      onOpen={(incidentId?: string) => navigation.navigate("IncidentDetail", { incidentId })}
       onAssistant={() => navigation.navigate("Assistant")}
       onSos={() => navigation.navigate("Sos", { state: "active" })}
     />
@@ -498,7 +502,7 @@ function MobileApp() {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
 
   useEffect(() => {
-    const subscription = addEmergencyActionListener((action) => {
+    const subscription = addEmergencyActionListener((action: string) => {
       if (navigationRef.isReady()) {
         if (action === "FAKE_CALL") {
           navigationRef.navigate("IncomingCall");
@@ -548,6 +552,8 @@ function MobileApp() {
         <Stack.Screen name="AdminDashboard" component={AdminDashboardRouteScreen} />
         <Stack.Screen name="AdminUsers" component={AdminUsersRouteScreen} />
         <Stack.Screen name="AdminIncidents" component={AdminIncidentsRouteScreen} />
+        <Stack.Screen name="VoiceTriggerConfig" component={VoiceTriggerConfigScreen} />
+        <Stack.Screen name="VoiceTraining" component={VoiceTrainingScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
