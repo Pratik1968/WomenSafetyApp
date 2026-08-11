@@ -10,6 +10,11 @@ const env = ((globalThis as { process?: { env?: Record<string, string | undefine
 const url = env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+// Exposed for callers that need to hit the functions gateway directly (e.g. a raw multipart
+// `fetch`, which functions-js can't send since it JSON-stringifies non-Blob/FormData bodies).
+export const supabaseUrl = url;
+export const supabaseAnonKey = anonKey;
+
 /** True when real Supabase credentials are present. Screens can show a "configure me" state otherwise. */
 export const isSupabaseConfigured = Boolean(url && anonKey);
 

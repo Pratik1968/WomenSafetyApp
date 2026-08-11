@@ -18,6 +18,10 @@ import { AdminIncidentsScreen } from "../screens/AdminIncidentsScreen";
 import { AdminAuthScreen } from "../screens/AdminAuthScreen";
 import { loadAdminSession, adminLogout } from "../data/adminAuth";
 
+// Module #12 — Crowd-Sourced Incident Reporting
+import { ReportScreen } from "../screens/ReportScreen";
+import { CommunityReportsScreen } from "../screens/CommunityReportsScreen";
+
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
@@ -37,6 +41,7 @@ export type RootStackParamList = {
   NearbyHelp: undefined;
   Assistant: undefined;
   Report: undefined;
+  CommunityReports: undefined;
   Notifications: undefined;
   HomeStub: undefined;
   NewIncident: undefined;
@@ -167,9 +172,6 @@ function NearbyHelpRoute({ navigation }: P<"NearbyHelp">) {
 function AssistantRoute({ navigation }: P<"Assistant">) {
   return <PlaceholderScreen title="AI Assistant" onBack={() => navigation.goBack()} />;
 }
-function ReportRoute({ navigation }: P<"Report">) {
-  return <PlaceholderScreen title="Report Area" onBack={() => navigation.goBack()} />;
-}
 function NotificationsRoute({ navigation }: P<"Notifications">) {
   return <PlaceholderScreen title="Notifications" onBack={() => navigation.goBack()} />;
 }
@@ -213,6 +215,20 @@ function UploadEvidenceRoute({ navigation, route }: P<"UploadEvidence">) {
 }
 function EvidenceDetailRoute({ navigation, route }: P<"EvidenceDetail">) {
   return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
+}
+
+// ---------- module #12: crowd-sourced incident reporting ----------
+function ReportRoute({ navigation }: P<"Report">) {
+  return (
+    <ReportScreen
+      onBack={() => navigation.goBack()}
+      onSubmitDone={() => navigation.replace("Home")}
+      onViewCommunity={() => navigation.replace("CommunityReports")}
+    />
+  );
+}
+function CommunityReportsRoute({ navigation }: P<"CommunityReports">) {
+  return <CommunityReportsScreen onBack={() => navigation.goBack()} onReportNew={() => navigation.navigate("Report")} />;
 }
 
 // ---------- admin routes (web-gated in the screens) ----------
@@ -297,6 +313,7 @@ function MobileApp() {
         <Stack.Screen name="NearbyHelp" component={NearbyHelpRoute} />
         <Stack.Screen name="Assistant" component={AssistantRoute} />
         <Stack.Screen name="Report" component={ReportRoute} />
+        <Stack.Screen name="CommunityReports" component={CommunityReportsRoute} />
         <Stack.Screen name="Notifications" component={NotificationsRoute} />
         <Stack.Screen name="HomeStub" component={HomeStubRoute} />
         <Stack.Screen name="NewIncident" component={NewIncidentRoute} />

@@ -1,10 +1,10 @@
 // Supabase Edge Function: emergency-service
-// Module #17 — Cloud Evidence Storage (evidence CRUD + secure retrieval).
+// Module #17 — Cloud Evidence Storage (evidence retrieval + secure access, module #17).
+// Upload (POST /evidence/upload-url, POST /evidence finalize) now lives in backend/storage.
+// Incident CRUD (POST/GET /incidents) now lives in backend/incident-report-service.
 //
 // Runs on Deno. All queries use the CALLER'S JWT so Row-Level Security enforces ownership.
 // Routes (mounted under /functions/v1/emergency-service):
-//   POST   /evidence/upload-url        -> signed upload URL + pending evidence row
-//   POST   /evidence                   -> finalize an uploaded evidence row
 //   GET    /evidence?type=&incident_id -> list caller's evidence
 //   GET    /evidence/:id               -> row + short-lived signed download URL (logged)
 //   GET    /evidence/:id/access-log    -> access history for the item
@@ -15,7 +15,7 @@ import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
 };
 
 function json(body: unknown, status = 200): Response {
@@ -52,74 +52,7 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
   try {
-    // ===== incidents =====
-    if (seg[0] === "incidents") {
-      // POST /incidents  -> create
-      if (req.method === "POST" && seg.length === 1) {
-        const body = await req.json().catch(() => ({}));
-        const { type, address, severity, lat, lng, status } = body ?? {};
-        if (!type) return json({ error: "type is required" }, 400);
-        const { data, error } = await supabase.from("incidents").insert({
-          user_id: user.id,
-          type,
-          status: status ?? "active",
-          severity: severity ?? 0,
-          address: address ?? null,
-          lat: lat ?? null,
-          lng: lng ?? null,
-        }).select().single();
-        if (error) return json({ error: error.message }, 400);
-        return json({ incident: data });
-      }
-      // GET /incidents -> list caller's incidents
-      if (req.method === "GET" && seg.length === 1) {
-        const { data, error } = await supabase.from("incidents").select("*").order("started_at", { ascending: false });
-        if (error) return json({ error: error.message }, 400);
-        return json({ incidents: data ?? [] });
-      }
-      return json({ error: "not found" }, 404);
-    }
-
     if (seg[0] !== "evidence") return json({ error: "not found" }, 404);
-
-    // ----- POST /evidence/upload-url -----
-    if (req.method === "POST" && seg[1] === "upload-url") {
-      const body = await req.json().catch(() => ({}));
-      const { file_name, type, mime_type, incident_id } = body ?? {};
-      if (!type) return json({ error: "type is required" }, 400);
-      const safeName = String(file_name ?? "evidence").replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
-
-      const { data: signed, error: sErr } = await supabase.storage
-        .from("evidence").createSignedUploadUrl(path);
-      if (sErr) return json({ error: sErr.message }, 400);
-
-      const { data: row, error: iErr } = await supabase.from("evidence").insert({
-        user_id: user.id, incident_id: incident_id ?? null, type,
-        storage_path: path, file_name: safeName, mime_type: mime_type ?? null, status: "pending",
-      }).select("id").single();
-      if (iErr) return json({ error: iErr.message }, 400);
-
-      return json({ evidence_id: row.id, path, token: signed.token, signedUrl: signed.signedUrl });
-    }
-
-    // ----- POST /evidence (finalize) -----
-    if (req.method === "POST" && seg.length === 1) {
-      const body = await req.json().catch(() => ({}));
-      const { evidence_id, size_bytes, duration_seconds, checksum_sha256, captured_at, tamper_seal } = body ?? {};
-      if (!evidence_id) return json({ error: "evidence_id is required" }, 400);
-      const { data, error } = await supabase.from("evidence").update({
-        size_bytes: size_bytes ?? 0,
-        duration_seconds: duration_seconds ?? null,
-        checksum_sha256: checksum_sha256 ?? null,
-        captured_at: captured_at ?? null,
-        tamper_seal: tamper_seal ?? null,
-        status: "ready",
-      }).eq("id", evidence_id).eq("user_id", user.id).select().single();
-      if (error) return json({ error: error.message }, 400);
-      await supabase.from("evidence_access_log").insert({ evidence_id, accessed_by: user.id, action: "upload" });
-      return json({ evidence: data });
-    }
 
     // ----- GET /evidence (list) -----
     if (req.method === "GET" && seg.length === 1) {
