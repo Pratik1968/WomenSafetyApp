@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react-native";
 import { UploadEvidenceScreen } from "./UploadEvidenceScreen";
 
 jest.mock("../data/evidence", () => ({ uploadEvidenceFile: jest.fn() }));
-jest.mock("expo-document-picker", () => ({ getDocumentAsync: jest.fn() }));
+jest.mock("expo-document-picker", () => ({ getDocumentAsync: jest.fn() }), { virtual: true });
 jest.mock("expo-image-picker", () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   launchImageLibraryAsync: jest.fn(),

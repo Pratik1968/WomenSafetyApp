@@ -23,7 +23,7 @@ test("continue is disabled until the number reaches the country's digit length, 
   });
   
   await waitFor(() => {
-    expect(onContinue).toHaveBeenCalledWith("+91 9876543210", expect.anything());
+    expect(onContinue).toHaveBeenCalledWith("+919876543210", expect.anything());
   });
 });
 
@@ -69,3 +69,4 @@ test("selecting a country updates the dial code and closes the sheet", async () 
   expect(screen.getByText("+1")).toBeTruthy();
   expect(screen.queryByPlaceholderText("Search")).toBeNull();
 });
+

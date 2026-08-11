@@ -1,18 +1,9 @@
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react-native";
 import { ReportScreen } from "./ReportScreen";
-import { submitIncidentReport } from "../data/reports";
+import { submitIncidentReport } from "../services/reportService";
 
-jest.mock("../data/reports", () => ({ submitIncidentReport: jest.fn() }));
-jest.mock("expo-image-picker", () => ({
-  requestCameraPermissionsAsync: jest.fn(),
-  launchCameraAsync: jest.fn(),
-  requestMediaLibraryPermissionsAsync: jest.fn(),
-  launchImageLibraryAsync: jest.fn(),
-}));
-jest.mock("expo-location", () => ({
-  requestForegroundPermissionsAsync: jest.fn(() => Promise.resolve({ status: "granted" })),
-  getCurrentPositionAsync: jest.fn(() => Promise.resolve({ coords: { latitude: 12.9716, longitude: 77.5946 } })),
-  reverseGeocodeAsync: jest.fn(() => Promise.resolve([{ street: "5th Cross", city: "Indiranagar" }])),
+jest.mock("../services/reportService", () => ({
+  submitIncidentReport: jest.fn(),
 }));
 
 const mockedSubmit = submitIncidentReport as jest.Mock;
@@ -24,7 +15,7 @@ afterEach(() => {
 
 async function renderReady(props: Parameters<typeof ReportScreen>[0] = {}) {
   await render(<ReportScreen {...props} />);
-  await waitFor(() => expect(screen.getAllByText("5th Cross, Indiranagar").length).toBeGreaterThan(0));
+  await waitFor(() => expect(screen.getByText("12.97160, 77.59460")).toBeTruthy());
 }
 
 describe("ReportScreen", () => {
@@ -73,11 +64,11 @@ describe("ReportScreen", () => {
     await waitFor(() => expect(screen.getByText("Thank you for speaking up")).toBeTruthy());
     expect(mockedSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        reportType: "harassment",
-        lat: 12.9716,
-        lng: 77.5946,
+        reportType: "HARASSMENT",
+        latitude: 12.9716,
+        longitude: 77.5946,
         address: "5th Cross, Indiranagar",
-      }),
+      })
     );
 
     await act(async () => {
@@ -97,7 +88,10 @@ describe("ReportScreen", () => {
       fireEvent.press(screen.getByText("Submit report"));
     });
 
-    await waitFor(() => expect(screen.getByText("network unavailable")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("network unavailable")).toBeTruthy()
+    );
     expect(screen.getByText("Submit report")).toBeTruthy();
   });
 });
+

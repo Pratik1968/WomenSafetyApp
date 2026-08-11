@@ -51,7 +51,7 @@ export function MapPicker({
         <WebView
           originWhitelist={["*"]}
           source={{ html: mapHtml(start.lat, start.lng) }}
-          onMessage={(e) => {
+          onMessage={(e: any) => {
             try {
               const c = JSON.parse(e.nativeEvent.data);
               if (typeof c.lat === "number" && typeof c.lng === "number") setCoords(c);

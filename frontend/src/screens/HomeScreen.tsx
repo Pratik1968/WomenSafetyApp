@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -35,11 +35,19 @@ import { BottomNav, type TabKey } from "../components/app/BottomNav";
 import { Dialog } from "../components/ds/Dialog";
 import { AppButton } from "../components/ds/AppButton";
 import { getMyProfile } from "../services/profileService";
+import { SosCountdownOverlay } from "../components/app/SosCountdownOverlay";
+import {
+  startShakeDetection,
+  stopShakeDetection,
+  addShakeTriggerListener,
+} from "../services/sosNativeService";
+import type { SOSTriggerSource } from "../services/sosOrchestratorService";
 
 export type HomeState = "default" | "monitoring" | "caution" | "loading";
 
 const QUICK_ACTIONS = [
   { label: "Safe Route", icon: RouteIcon },
+  { label: "Fake Call", icon: PhoneCall },
   { label: "Nearby Police", icon: ShieldCheck },
   { label: "Hospitals", icon: Ambulance },
   { label: "AI Assistant", icon: Sparkles },
@@ -104,6 +112,7 @@ export function HomeScreen({
   onSafetyMode,
   onAssistant,
   onQuickAction,
+  onQuickActionLongPress,
   onTab,
   locationPermissionGranted = true,
   notificationPermissionGranted = true,
@@ -114,6 +123,7 @@ export function HomeScreen({
   onSafetyMode?: () => void;
   onAssistant?: () => void;
   onQuickAction?: (actionLabel: string) => void;
+  onQuickActionLongPress?: (actionLabel: string) => void;
   onTab?: (t: TabKey) => void;
   locationPermissionGranted?: boolean;
   notificationPermissionGranted?: boolean;
@@ -147,7 +157,42 @@ export function HomeScreen({
         .toUpperCase()
     : "U";
 
-  const handleSosTrigger = async () => {
+  // ── Countdown overlay state ───────────────────────────────────
+  const [countdownVisible, setCountdownVisible] = useState(false);
+  const [countdownSource, setCountdownSource] = useState<SOSTriggerSource>("BUTTON");
+
+  const showCountdown = useCallback(
+    (source: SOSTriggerSource) => {
+      setCountdownSource(source);
+      setCountdownVisible(true);
+    },
+    []
+  );
+
+  const handleCountdownFire = useCallback(() => {
+    setCountdownVisible(false);
+    setPressed(true);
+    onSos?.();
+  }, [onSos]);
+
+  const handleCountdownCancel = useCallback(() => {
+    setCountdownVisible(false);
+    setPressed(false);
+  }, []);
+
+  // ── Start native shake-detection service on mount ────────────
+  useEffect(() => {
+    startShakeDetection();
+    const sub = addShakeTriggerListener(() => {
+      showCountdown("SHAKE");
+    });
+    return () => {
+      sub.remove();
+      stopShakeDetection();
+    };
+  }, [showCountdown]);
+
+  const handleSosTrigger = useCallback(async () => {
     try {
       if (typeof Location?.requestForegroundPermissionsAsync === "function") {
         await Location.requestForegroundPermissionsAsync();
@@ -158,9 +203,8 @@ export function HomeScreen({
     } catch (err) {
       console.warn("Native SOS permission request error:", err);
     }
-    setPressed(true);
-    onSos?.();
-  };
+    showCountdown("BUTTON");
+  }, [showCountdown]);
 
   const status =
     state === "monitoring"
@@ -171,6 +215,14 @@ export function HomeScreen({
 
   return (
     <View style={styles.screen}>
+      {/* SOS Countdown Overlay — appears over everything for 4 s before firing */}
+      <SosCountdownOverlay
+        visible={countdownVisible}
+        triggerSource={countdownSource}
+        onFire={handleCountdownFire}
+        onCancel={handleCountdownCancel}
+      />
+
       <View style={styles.header}>
         <LinearGradient colors={gradientBrand as unknown as [string, string, ...string[]]} style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
@@ -292,6 +344,8 @@ export function HomeScreen({
               <Pressable
                 key={label}
                 onPress={() => onQuickAction?.(label)}
+                onLongPress={() => onQuickActionLongPress?.(label)}
+                delayLongPress={300}
                 style={styles.actionItem}
               >
                 <Icon size={22} color={colors.primary} strokeWidth={1.8} />
@@ -509,3 +563,4 @@ const styles = StyleSheet.create({
   footerNote: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 },
   footerNoteText: { fontSize: 12, color: colors.mutedForeground },
 });
+

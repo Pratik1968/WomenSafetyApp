@@ -1,0 +1,173 @@
+/**
+ * Expo Location Service Implementation
+ * Handles GPS coordinate acquisition, live tracking subscriptions, reverse geocoding, and permission checks.
+ */
+
+import * as Location from 'expo-location';
+import { LocationData, Coordinates, AddressDetails } from '../types/location.types';
+import { logger } from '../../../utils/logger';
+
+export class LocationService {
+  private static instance: LocationService;
+  private watchSubscription: Location.LocationSubscription | null = null;
+  private lastKnownLocation: LocationData | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): LocationService {
+    if (!LocationService.instance) {
+      LocationService.instance = new LocationService();
+    }
+    return LocationService.instance;
+  }
+
+  /**
+   * Request foreground location permission from device
+   */
+  public async requestPermissions(): Promise<boolean> {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      const granted = status === 'granted';
+      logger.info(`Location permission status: [${status}]`);
+      return granted;
+    } catch (err) {
+      logger.error('Failed to request location permissions:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Get current GPS location and reverse geocode human-readable address
+   */
+  public async getCurrentLocation(): Promise<LocationData | null> {
+    try {
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        logger.warn('Location permission denied. Returning default fallback location.');
+        return this.getDefaultFallbackLocation();
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coordinates: Coordinates = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        altitude: loc.coords.altitude,
+        accuracy: loc.coords.accuracy,
+      };
+
+      const address = await this.reverseGeocode(loc.coords.latitude, loc.coords.longitude);
+
+      const locationData: LocationData = {
+        coordinates,
+        address: address || undefined,
+        timestamp: new Date(loc.timestamp).toISOString(),
+      };
+
+      this.lastKnownLocation = locationData;
+      return locationData;
+    } catch (err) {
+      logger.error('Error fetching current position:', err);
+      return this.getDefaultFallbackLocation();
+    }
+  }
+
+  /**
+   * Reverse geocode latitude and longitude to street address
+   */
+  public async reverseGeocode(latitude: number, longitude: number): Promise<AddressDetails | null> {
+    try {
+      const results = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (results && results.length > 0) {
+        const item = results[0];
+        const formattedAddress = [item.name, item.street, item.city, item.region, item.postalCode]
+          .filter(Boolean)
+          .join(', ');
+
+        return {
+          street: item.street || item.name,
+          city: item.city,
+          region: item.region,
+          postalCode: item.postalCode,
+          country: item.country,
+          formattedAddress: formattedAddress || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        };
+      }
+    } catch (err) {
+      logger.error('Reverse geocoding failed:', err);
+    }
+
+    return {
+      formattedAddress: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+    };
+  }
+
+  /**
+   * Start live GPS position tracking
+   */
+  public async startLocationTracking(
+    callback: (location: LocationData) => void
+  ): Promise<void> {
+    try {
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) return;
+
+      if (this.watchSubscription) {
+        this.watchSubscription.remove();
+      }
+
+      this.watchSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        async (loc) => {
+          const coordinates: Coordinates = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            accuracy: loc.coords.accuracy,
+          };
+          const address = await this.reverseGeocode(loc.coords.latitude, loc.coords.longitude);
+          const locationData: LocationData = {
+            coordinates,
+            address: address || undefined,
+            timestamp: new Date(loc.timestamp).toISOString(),
+          };
+          this.lastKnownLocation = locationData;
+          callback(locationData);
+        }
+      );
+      logger.info('Live GPS location tracking started.');
+    } catch (err) {
+      logger.error('Failed to start location tracking:', err);
+    }
+  }
+
+  /**
+   * Stop live GPS tracking subscription
+   */
+  public stopLocationTracking(): void {
+    if (this.watchSubscription) {
+      this.watchSubscription.remove();
+      this.watchSubscription = null;
+      logger.info('Live GPS location tracking stopped.');
+    }
+  }
+
+  public getLastKnownLocation(): LocationData | null {
+    return this.lastKnownLocation;
+  }
+
+  private getDefaultFallbackLocation(): LocationData {
+    return {
+      coordinates: { latitude: 12.9716, longitude: 77.5946 },
+      address: { formattedAddress: 'Indiranagar 100 Ft Road, Bengaluru' },
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+export const locationService = LocationService.getInstance();

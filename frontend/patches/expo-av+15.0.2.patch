@@ -1,0 +1,80 @@
+diff --git a/node_modules/expo-av/android/src/main/java/expo/modules/av/ViewUtils.kt b/node_modules/expo-av/android/src/main/java/expo/modules/av/ViewUtils.kt
+index d18b58a..8345bdf 100644
+--- a/node_modules/expo-av/android/src/main/java/expo/modules/av/ViewUtils.kt
++++ b/node_modules/expo-av/android/src/main/java/expo/modules/av/ViewUtils.kt
+@@ -4,21 +4,30 @@ import androidx.annotation.AnyThread
+ import androidx.annotation.UiThread
+ import com.facebook.react.bridge.UiThreadUtil
+ import com.facebook.react.uimanager.IllegalViewOperationException
++import com.facebook.react.uimanager.UIManagerHelper
+ import expo.modules.av.video.VideoView
+ import expo.modules.av.video.VideoViewWrapper
+ import expo.modules.core.ModuleRegistry
+ import expo.modules.core.Promise
+-import expo.modules.core.interfaces.services.UIManager
++import expo.modules.core.interfaces.ActivityProvider
+ 
+ object ViewUtils {
+   interface VideoViewCallback {
+     fun runWithVideoView(videoView: VideoView): Unit
+   }
+ 
++  private fun resolveVideoViewWrapper(moduleRegistry: ModuleRegistry, viewTag: Int): VideoViewWrapper? {
++    val activity = moduleRegistry.getModule(ActivityProvider::class.java)?.currentActivity ?: return null
++    val decorView = activity.window?.decorView ?: return null
++    val reactContext = UIManagerHelper.getReactContext(decorView) ?: return null
++    val uiManager = UIManagerHelper.getUIManagerForReactTag(reactContext, viewTag) ?: return null
++    return uiManager.resolveView(viewTag) as? VideoViewWrapper
++  }
++
+   @UiThread
+   private fun tryRunWithVideoViewOnUiThread(moduleRegistry: ModuleRegistry, viewTag: Int, callback: VideoViewCallback, promise: Promise) {
+     try {
+-      val videoWrapperView = moduleRegistry.getModule(UIManager::class.java).resolveView(viewTag) as VideoViewWrapper?
++      val videoWrapperView = resolveVideoViewWrapper(moduleRegistry, viewTag)
+       val videoView = videoWrapperView?.videoViewInstance
+       if (videoView != null) {
+         callback.runWithVideoView(videoView)
+@@ -49,7 +58,7 @@ object ViewUtils {
+   @UiThread
+   private fun tryRunWithVideoViewOnUiThread(moduleRegistry: ModuleRegistry, viewTag: Int, callback: VideoViewCallback, promise: expo.modules.kotlin.Promise) {
+     try {
+-      val videoWrapperView = moduleRegistry.getModule(UIManager::class.java).resolveView(viewTag) as VideoViewWrapper?
++      val videoWrapperView = resolveVideoViewWrapper(moduleRegistry, viewTag)
+       val videoView = videoWrapperView?.videoViewInstance
+       if (videoView != null) {
+         callback.runWithVideoView(videoView)
+diff --git a/node_modules/expo-av/android/src/main/java/expo/modules/av/video/FullscreenVideoPlayer.java b/node_modules/expo-av/android/src/main/java/expo/modules/av/video/FullscreenVideoPlayer.java
+index ec4c842..52ef201 100644
+--- a/node_modules/expo-av/android/src/main/java/expo/modules/av/video/FullscreenVideoPlayer.java
++++ b/node_modules/expo-av/android/src/main/java/expo/modules/av/video/FullscreenVideoPlayer.java
+@@ -11,7 +11,6 @@ import android.widget.FrameLayout;
+ import java.lang.ref.WeakReference;
+ 
+ import expo.modules.core.ModuleRegistry;
+-import expo.modules.core.interfaces.services.KeepAwakeManager;
+ import expo.modules.av.player.PlayerData;
+ import expo.modules.kotlin.AppContext;
+ 
+@@ -30,20 +29,7 @@ public class FullscreenVideoPlayer extends Dialog {
+       if (fullscreenVideoPlayer != null) {
+         final Window window = fullscreenVideoPlayer.getWindow();
+         if (window != null) {
+-          boolean isPlaying =
+-              fullscreenVideoPlayer.mVideoView.getStatus().containsKey(PlayerData.STATUS_IS_PLAYING_KEY_PATH)
+-                  && fullscreenVideoPlayer.mVideoView.getStatus().getBoolean(PlayerData.STATUS_IS_PLAYING_KEY_PATH);
+-          AppContext appContext = fullscreenVideoPlayer.mAppContext.get();
+-          ModuleRegistry moduleRegistry = appContext != null ? appContext.getLegacyModuleRegistry() : null;
+-          if (moduleRegistry != null) {
+-            KeepAwakeManager keepAwakeManager = moduleRegistry.getModule(KeepAwakeManager.class);
+-            boolean keepAwakeIsActivated = keepAwakeManager != null && keepAwakeManager.isActivated();
+-            if (isPlaying || keepAwakeIsActivated) {
+-              window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+-            } else {
+-              window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+-            }
+-          }
++          window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+         }
+         fullscreenVideoPlayer.mKeepScreenOnHandler.postDelayed(this, UPDATE_KEEP_SCREEN_ON_FLAG_MS);
+       }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, Pressable, StyleSheet, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Lock, Eye, EyeOff, ShieldCheck, Phone } from "lucide-react-native";
+import { signOut } from "@react-native-firebase/auth";
 import { AppButton } from "../components/ds/AppButton";
 import { AppInput } from "../components/ds/Field";
 import { NavBar } from "../components/ds/NavBar";
@@ -38,8 +39,8 @@ export function LoginScreen({
     try {
       clearCurrentProfile();
       await clearPasswordSessionToken();
-      if (auth.currentUser && typeof (auth as any).signOut === "function") {
-        await (auth as any).signOut().catch(() => {});
+      if (auth.currentUser) {
+        await signOut(auth).catch(() => {});
       }
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
@@ -185,3 +186,4 @@ const styles = StyleSheet.create({
   otpLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 8 },
   otpLinkText: { fontSize: 14, fontWeight: "500", color: colors.mutedForeground, textDecorationLine: "underline" },
 });
+

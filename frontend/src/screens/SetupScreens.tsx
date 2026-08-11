@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Check, Plus, Search, Trash2, UserRound } from "lucide-react-native";
 import { NavBar } from "../components/ds/NavBar";
@@ -11,6 +11,7 @@ import { AppInput, FieldLabel } from "../components/ds/Field";
 import { EmptyState } from "../components/ds/EmptyState";
 import { BottomSheet } from "../components/ds/BottomSheet";
 import { ListItem } from "../components/ds/ListItem";
+import { Badge } from "../components/ds/Badge";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { AuroraHalo } from "../components/ds/Aurora";
 import { PHONE_CONTACTS, type PhoneContact } from "../data/mock";
@@ -50,28 +51,30 @@ function SetupShell({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <NavBar
-        onBack={onBack}
-        action={
-          onSkip ? (
-            <Pressable onPress={onSkip}>
-              <Text style={styles.skip}>Skip</Text>
-            </Pressable>
-          ) : undefined
-        }
-      />
-      <View style={styles.header}>
-        <ProgressBar value={step / SETUP_STEPS} />
-        <Text style={styles.stepCaption}>
-          Step {step} of {SETUP_STEPS}
-        </Text>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      </View>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <NavBar
+          onBack={onBack}
+          action={
+            onSkip ? (
+              <Pressable onPress={onSkip}>
+                <Text style={styles.skip}>Skip</Text>
+              </Pressable>
+            ) : undefined
+          }
+        />
+        <View style={styles.header}>
+          <ProgressBar value={step / SETUP_STEPS} />
+          <Text style={styles.stepCaption}>
+            Step {step} of {SETUP_STEPS}
+          </Text>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        </View>
 
-      <Body {...bodyProps}>{children}</Body>
+        <Body {...bodyProps}>{children}</Body>
 
-      <View style={styles.footer}>{footer}</View>
+        <View style={styles.footer}>{footer}</View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -82,10 +85,12 @@ export function SetupNameScreen({
   state = "empty",
   onBack,
   onNext,
+  onSkip,
 }: {
   state?: "empty" | "filled";
   onBack?: () => void;
   onNext?: (name: string) => void;
+  onSkip?: () => void;
 }) {
   const [name, setName] = useState(state === "filled" ? "Rama Krishna" : "");
   const ok = name.trim().length >= 2;
@@ -96,6 +101,7 @@ export function SetupNameScreen({
       title="What should we call you?"
       subtitle="This is the name your emergency contacts will see."
       onBack={onBack}
+      onSkip={onSkip}
       footer={
         <AppButton disabled={!ok} onPress={() => onNext?.(name.trim())}>
           Continue
@@ -116,10 +122,12 @@ export function SetupGenderScreen({
   state = "empty",
   onBack,
   onNext,
+  onSkip,
 }: {
   state?: "empty" | "selected";
   onBack?: () => void;
   onNext?: (gender: string) => void;
+  onSkip?: () => void;
 }) {
   const [value, setValue] = useState<string | null>(state === "selected" ? "Female" : null);
 
@@ -129,6 +137,7 @@ export function SetupGenderScreen({
       title="How do you identify?"
       subtitle="Used only to personalise safety guidance. Never shared."
       onBack={onBack}
+      onSkip={onSkip}
       footer={
         <AppButton disabled={!value} onPress={() => onNext?.(value || "")}>
           Continue
@@ -152,10 +161,12 @@ export function SetupBloodScreen({
   state = "empty",
   onBack,
   onNext,
+  onSkip,
 }: {
   state?: "empty" | "selected";
   onBack?: () => void;
   onNext?: (bloodGroup: string) => void;
+  onSkip?: () => void;
 }) {
   const [value, setValue] = useState<string | null>(state === "selected" ? "O+" : null);
 
@@ -165,6 +176,7 @@ export function SetupBloodScreen({
       title="Your blood group"
       subtitle="Responders see this the moment an SOS is raised."
       onBack={onBack}
+      onSkip={onSkip}
       footer={
         <AppButton disabled={!value} onPress={() => onNext?.(value || "")}>
           Continue
@@ -301,7 +313,6 @@ export function SetupContactsScreen({
     isMaxReached,
   } = useEmergencyContacts(initial, { skipProfileFetch: !state });
 
-  // If state was explicitly passed (e.g., in legacy component tests), consider permission granted
   const effectivePermission = state ? "granted" : permissionStatus;
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -342,14 +353,12 @@ export function SetupContactsScreen({
       }
     }
 
-    // Try native contact picker first
     const picked = await pickNativeContact();
     if (picked) {
       openAddDetails(picked);
       return;
     }
 
-    // Fall back to opening contacts sheet with device/fallback contacts
     await fetchDeviceContacts();
     setSheetOpen(true);
   };
@@ -578,6 +587,7 @@ export function SetupCompleteScreen({ onDone }: { onDone?: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   skip: { paddingRight: 8, fontSize: 15, fontWeight: "500", color: colors.mutedForeground },
   header: { paddingHorizontal: 32, paddingTop: 4 },
   stepCaption: { marginTop: 12, fontSize: 13, fontWeight: "500", letterSpacing: 0.52, textTransform: "uppercase", color: colors.mutedForeground },
@@ -655,3 +665,4 @@ const styles = StyleSheet.create({
   completeTitle: { marginTop: 32, fontSize: 30, lineHeight: 34, fontWeight: "600", letterSpacing: -0.9, color: colors.foreground, textAlign: "center" },
   completeBody: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground, textAlign: "center" },
 });
+

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, Text, Pressable, Modal, ScrollView, StyleSheet } from "react-native";
+import { View, Text, Pressable, Modal, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { colors } from "../../theme/tokens";
 
 export function BottomSheet({
@@ -16,7 +16,10 @@ export function BottomSheet({
   if (!open) return null;
   return (
     <Modal transparent visible={open} animationType="none" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <Pressable
           accessibilityLabel="Close"
           accessibilityRole="button"
@@ -30,7 +33,7 @@ export function BottomSheet({
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
