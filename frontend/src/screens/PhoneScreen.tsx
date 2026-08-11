@@ -67,9 +67,7 @@ export function PhoneScreen({
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <NavBar
-          onBack={onBack}
-        />
+        <NavBar onBack={onBack} />
 
         <View style={styles.content}>
           <Text style={styles.headline}>What's your number?</Text>
@@ -175,3 +173,4 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, height: "100%", fontSize: 16, color: colors.foreground },
 });
+

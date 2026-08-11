@@ -19,6 +19,17 @@ export const RELATIONSHIP_OPTIONS = [
   "FRIEND",
   "OTHER",
 ] as const;
+export type RelationshipOption = (typeof RELATIONSHIP_OPTIONS)[number];
+
+export function normalizeRelationship(value?: string | null, fallback: RelationshipOption = "OTHER"): RelationshipOption {
+  if (!value) return fallback;
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized === "BEST_FRIEND") return "FRIEND";
+  return RELATIONSHIP_OPTIONS.includes(normalized as RelationshipOption)
+    ? (normalized as RelationshipOption)
+    : fallback;
+}
+
 
 export function formatContact(raw: any, relation: string = "OTHER"): PhoneContact {
   const name = raw.name || [raw.firstName, raw.lastName].filter(Boolean).join(" ") || "Contact";
@@ -41,7 +52,7 @@ export function formatContact(raw: any, relation: string = "OTHER"): PhoneContac
     name,
     initials,
     phone: phone || "No number",
-    relation: raw.relationship || raw.relation || relation,
+    relation: normalizeRelationship(raw.relationship || raw.relation || relation),
     priority: raw.priority ?? undefined,
   };
 }
@@ -75,30 +86,32 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
     }
   }, []);
 
+  const refreshContacts = useCallback(async () => {
+    if (initialContacts && initialContacts.length > 0) return;
+    if (skipProfileFetch) {
+      const stored = await contactStorageService.getStoredEmergencyContacts();
+      if (stored && stored.length > 0) {
+        setContacts(stored);
+      }
+      return;
+    }
+
+    const profile = await getMyProfile();
+    const userId = profile?.id;
+    if (userId) {
+      await loadBackendContacts(userId);
+    } else {
+      const stored = await contactStorageService.getStoredEmergencyContacts();
+      if (stored && stored.length > 0) {
+        setContacts(stored);
+      }
+    }
+  }, [initialContacts, loadBackendContacts, skipProfileFetch]);
+
   // Load profile and this user's saved contacts from the backend
   useEffect(() => {
-    (async () => {
-      if (initialContacts && initialContacts.length > 0) return;
-      if (skipProfileFetch) {
-        const stored = await contactStorageService.getStoredEmergencyContacts();
-        if (stored && stored.length > 0) {
-          setContacts(stored);
-        }
-        return;
-      }
-
-      const profile = await getMyProfile();
-      const userId = profile?.id;
-      if (userId) {
-        await loadBackendContacts(userId);
-      } else {
-        const stored = await contactStorageService.getStoredEmergencyContacts();
-        if (stored && stored.length > 0) {
-          setContacts(stored);
-        }
-      }
-    })();
-  }, [initialContacts, loadBackendContacts, skipProfileFetch]);
+    refreshContacts();
+  }, [refreshContacts]);
 
   const checkPermission = useCallback(async () => {
     try {
@@ -195,7 +208,8 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
 
       const profile = await getMyProfile();
       const priorityNum = priority ?? contacts.length + 1;
-      const updatedContact = { ...contact, relation: relationship, priority: priorityNum };
+      const normalizedRelationship = normalizeRelationship(relationship, "FRIEND");
+      const updatedContact = { ...contact, relation: normalizedRelationship, priority: priorityNum };
 
       if (profile?.id) {
         try {
@@ -206,7 +220,7 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
               user_id: profile.id,
               name: contact.name,
               phone: contact.phone,
-              relationship: relationship,
+              relationship: normalizedRelationship,
               priority: priorityNum,
             }),
           });
@@ -234,7 +248,7 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
       const existing = contacts.find((c) => c.id === id);
       if (!existing) return false;
 
-      const relation = updates.relation ?? existing.relation;
+      const relation = normalizeRelationship(updates.relation ?? existing.relation, "FRIEND");
       const priority = updates.priority ?? existing.priority ?? 1;
       const updatedContact = { ...existing, relation, priority };
 
@@ -296,7 +310,7 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
       if (exists) {
         await removeContact(contact.id);
       } else {
-        await addContact(contact, relationship);
+        await addContact(contact, normalizeRelationship(relationship, "FRIEND"));
       }
     },
     [contacts, addContact, removeContact]
@@ -314,6 +328,7 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
     requestPermission,
     fetchDeviceContacts,
     pickNativeContact,
+    refreshContacts,
     addContact,
     updateContact,
     removeContact,
@@ -321,3 +336,4 @@ export function useEmergencyContacts(initialContacts: PhoneContact[] = [], optio
     isMaxReached: contacts.length >= 5,
   };
 }
+

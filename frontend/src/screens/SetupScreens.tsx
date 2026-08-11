@@ -313,7 +313,6 @@ export function SetupContactsScreen({
     isMaxReached,
   } = useEmergencyContacts(initial, { skipProfileFetch: !state });
 
-  // If state was explicitly passed (e.g., in legacy component tests), consider permission granted
   const effectivePermission = state ? "granted" : permissionStatus;
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -354,14 +353,12 @@ export function SetupContactsScreen({
       }
     }
 
-    // Try native contact picker first
     const picked = await pickNativeContact();
     if (picked) {
       openAddDetails(picked);
       return;
     }
 
-    // Fall back to opening contacts sheet with device/fallback contacts
     await fetchDeviceContacts();
     setSheetOpen(true);
   };
@@ -536,8 +533,8 @@ export function SetupMedicalScreen({
   return (
     <SetupShell
       step={6}
-      title="Medical Setup"
-      subtitle="Optional medical details for responders."
+      title="Medical information"
+      subtitle="Optional, but it can save minutes when every second counts."
       onBack={onBack}
       onSkip={onSkip}
       scroll
@@ -668,3 +665,4 @@ const styles = StyleSheet.create({
   completeTitle: { marginTop: 32, fontSize: 30, lineHeight: 34, fontWeight: "600", letterSpacing: -0.9, color: colors.foreground, textAlign: "center" },
   completeBody: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground, textAlign: "center" },
 });
+

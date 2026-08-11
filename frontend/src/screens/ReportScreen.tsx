@@ -35,9 +35,11 @@ function assetToAttachment(asset: ImagePicker.ImagePickerAsset): Attachment {
 export function ReportScreen({
   onBack,
   onSubmitDone,
+  onViewCommunity,
 }: {
   onBack?: () => void;
   onSubmitDone?: () => void;
+  onViewCommunity?: () => void;
 }) {
   const [picked, setPicked] = useState<ReportType | null>(null);
   const [description, setDescription] = useState("");
@@ -97,6 +99,11 @@ export function ReportScreen({
         </View>
         <View style={styles.successFooter}>
           <AppButton onPress={onSubmitDone}>Done</AppButton>
+          {onViewCommunity && (
+            <Pressable onPress={onViewCommunity} style={styles.successLink}>
+              <Text style={styles.successLinkText}>View community reports</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -151,9 +158,9 @@ export function ReportScreen({
         mediaFiles: attachments,
       });
       setSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to submit incident report:", err);
-      setError("Couldn't submit your report. Check your connection and try again.");
+      setError(err?.message || "Couldn't submit your report. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -326,5 +333,8 @@ const styles = StyleSheet.create({
   successContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, textAlign: "center" },
   successTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 24, textAlign: "center" },
   successSub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 12, lineHeight: 22 },
-  successFooter: { paddingHorizontal: 20, paddingBottom: 24 },
+  successFooter: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
+  successLink: { alignItems: "center", paddingVertical: 4 },
+  successLinkText: { fontSize: 14, fontWeight: "600", color: colors.primary },
 });
+

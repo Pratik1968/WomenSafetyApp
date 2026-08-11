@@ -7,6 +7,9 @@ import {
   AlertTriangle,
   Search,
   Download,
+  Sparkles,
+  Mic,
+  Video,
 } from "lucide-react-native";
 import { colors, radii } from "../theme/tokens";
 import { AppButton } from "../components/ds/AppButton";
@@ -26,8 +29,6 @@ import {
 import { fetchIncidentHistory } from "../services/incidentSyncService";
 import { auth } from "../services/firebaseConfig";
 
-// Static mock data for non-SOS entries (journeys, reports) — will be replaced
-// when those features integrate with the orchestrator.
 const MOCK_INCIDENTS = [
   { id: "mock-1", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
   { id: "mock-2", kind: "report" as const, title: "Area report", place: "5th Cross stretch", date: "04 Jun", status: "under-review" as const },
@@ -53,7 +54,6 @@ function formatTime(ts: number): string {
   return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
-
 export type HistoryState = "default" | "empty" | "loading";
 
 export function HistoryScreen({
@@ -73,9 +73,6 @@ export function HistoryScreen({
   const [realSosIncidents, setRealSosIncidents] = useState<SOSIncident[]>([]);
   const [loadingIncidents, setLoadingIncidents] = useState(true);
 
-  // Load real SOS incidents from AsyncStorage on mount, then reconcile with
-  // the backend in the background (covers reinstall/multi-device — local
-  // storage remains the primary, immediately-available source of truth).
   useEffect(() => {
     getIncidents()
       .then(setRealSosIncidents)
@@ -143,7 +140,6 @@ export function HistoryScreen({
           />
         ) : (
           <View style={styles.listSection}>
-            {/* Real SOS incidents from orchestrator */}
             {!loadingIncidents && realSosIncidents.length > 0 && (
               <>
                 <Text style={styles.monthHeader}>SOS INCIDENTS</Text>
@@ -174,7 +170,6 @@ export function HistoryScreen({
               </>
             )}
 
-            {/* Static mock entries for journeys/reports */}
             <Text style={styles.monthHeader}>JUNE 2026</Text>
             {MOCK_INCIDENTS.map((it) => {
               const Icon = it.kind === "journey" ? RouteIcon : Flag;
@@ -305,7 +300,6 @@ export function IncidentDetailScreen({
           </View>
         </View>
 
-        {/* Timeline */}
         <Text style={styles.sectionHeading}>TIMELINE</Text>
         <Card style={styles.sectionCard}>
           {incident.timeline.map((entry, i) => {
@@ -397,3 +391,4 @@ const styles = StyleSheet.create({
   aiBullet: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
   sectionHeading: { fontSize: 13, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5, marginTop: 12, marginBottom: 8 },
 });
+

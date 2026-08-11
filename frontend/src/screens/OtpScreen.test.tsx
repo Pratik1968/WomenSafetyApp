@@ -70,3 +70,4 @@ test("shows an error for a wrong code and clears it once the user edits the code
   expect(screen.queryByText("That code isn't right. Check the message and try again.")).toBeNull();
   jest.useRealTimers();
 });
+

@@ -18,25 +18,33 @@ describe("LoginScreen", () => {
   });
 
   it("allows entering credentials and submitting password login", async () => {
-    const onLoggedIn = jest.fn();
-    (globalThis as any).fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ access_token: "test-token", user: { id: "user-1" } }),
+    const mockFetch = jest.fn().mockImplementation((url) => {
+      if (url.includes("/auth/login")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ access_token: "test-token", user: { id: "1", firebase_uid: "uid1", full_name: "Test User" } }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
     });
+    (globalThis as any).fetch = mockFetch;
 
+    const onLoggedIn = jest.fn();
     await render(<LoginScreen onLoggedIn={onLoggedIn} />);
-
+    
     await act(async () => {
       fireEvent.changeText(screen.getByPlaceholderText("Email or Phone number"), "user@example.com");
       fireEvent.changeText(screen.getByPlaceholderText("App password"), "securepass123");
     });
-
+    
     await act(async () => {
       fireEvent.press(screen.getByText("Log in with Password"));
     });
-
+    
     await waitFor(() => {
       expect(onLoggedIn).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
   });
 });
+

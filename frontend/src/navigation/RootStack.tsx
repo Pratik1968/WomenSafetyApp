@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -29,17 +29,26 @@ import { SafeRouteScreen } from "../screens/SafeRouteScreen";
 import { NearbyHelpScreen } from "../screens/NearbyHelpScreen";
 import { AssistantScreen } from "../screens/AssistantScreen";
 import { ReportScreen } from "../screens/ReportScreen";
+import { CommunityReportsScreen } from "../screens/CommunityReportsScreen";
 import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { HomeStubScreen } from "../screens/HomeStubScreen";
 import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { WearableScreen } from "../screens/WearableScreen";
+import { IncidentsScreen } from "../screens/IncidentsScreen";
+import { NewIncidentScreen } from "../screens/NewIncidentScreen";
+import { UploadEvidenceScreen } from "../screens/UploadEvidenceScreen";
+import { EvidenceDetailScreen } from "../screens/EvidenceDetailScreen";
+import { AdminAuthScreen } from "../screens/AdminAuthScreen";
+import { AdminDashboardScreen } from "../screens/AdminDashboardScreen";
+import { AdminUsersScreen } from "../screens/AdminUsersScreen";
+import { AdminIncidentsScreen } from "../screens/AdminIncidentsScreen";
+import { loadAdminSession, adminLogout } from "../data/adminAuth";
 import { type TabKey } from "../components/app/BottomNav";
 import { saveProfile, clearCurrentProfile } from "../services/profileService";
 import { contactStorageService } from "../services/contactStorageService";
 import { API_BASE_URL } from "../api/config";
 import { getAuthHeader, setPhoneConfirmation, getPhoneConfirmation } from "../services/firebaseConfig";
 import { addEmergencyActionListener } from "../modules/EmergencyModule";
-
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -60,19 +69,27 @@ export type RootStackParamList = {
   NearbyHelp: undefined;
   Assistant: undefined;
   Report: undefined;
+  CommunityReports: undefined;
   Notifications: undefined;
   Settings: undefined;
   DataPrivacy: undefined;
   ManageContacts: undefined;
-  IncidentDetail: { incidentId: string };
+  NewIncident: undefined;
+  IncidentDetail: { incidentId?: string; id?: string } | undefined;
+  UploadEvidence: { incidentId?: string } | undefined;
+  EvidenceDetail: { id?: string } | undefined;
   HomeStub: undefined;
   IncomingCall: undefined;
   Wearable: undefined;
+  AdminDashboard: undefined;
+  AdminUsers: undefined;
+  AdminIncidents: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+type P<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
 
-function SplashRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Splash">) {
+function SplashRouteScreen({ navigation }: P<"Splash">) {
   useEffect(() => {
     const t = setTimeout(() => navigation.replace("Onboarding"), 2600);
     return () => clearTimeout(t);
@@ -80,7 +97,7 @@ function SplashRouteScreen({ navigation }: NativeStackScreenProps<RootStackParam
   return <SplashScreen />;
 }
 
-function OnboardingRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Onboarding">) {
+function OnboardingRouteScreen({ navigation }: P<"Onboarding">) {
   const [step, setStep] = useState(0);
   const isLast = step === ONBOARDING_STEPS.length - 1;
   return (
@@ -92,7 +109,7 @@ function OnboardingRouteScreen({ navigation }: NativeStackScreenProps<RootStackP
   );
 }
 
-function WelcomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Welcome">) {
+function WelcomeRouteScreen({ navigation }: P<"Welcome">) {
   return (
     <WelcomeScreen
       onContinue={() => navigation.navigate("Phone")}
@@ -101,7 +118,7 @@ function WelcomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackPara
   );
 }
 
-function LoginRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Login">) {
+function LoginRouteScreen({ navigation }: P<"Login">) {
   return (
     <LoginScreen
       onBack={() => navigation.goBack()}
@@ -111,7 +128,7 @@ function LoginRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamL
   );
 }
 
-function PhoneRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Phone">) {
+function PhoneRouteScreen({ navigation }: P<"Phone">) {
   return (
     <PhoneScreen
       onBack={() => navigation.goBack()}
@@ -124,7 +141,7 @@ function PhoneRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamL
   );
 }
 
-function OtpRouteScreen({ navigation, route }: NativeStackScreenProps<RootStackParamList, "Otp">) {
+function OtpRouteScreen({ navigation, route }: P<"Otp">) {
   const phone = route.params?.phone;
   const confirmation = getPhoneConfirmation();
 
@@ -147,11 +164,10 @@ function OtpRouteScreen({ navigation, route }: NativeStackScreenProps<RootStackP
 const SETUP_ORDER = ["Name", "Gender", "Blood", "Birthday", "Contacts", "Medical", "Done"] as const;
 type SetupStep = (typeof SETUP_ORDER)[number];
 
-function SetupRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Setup">) {
+function SetupRouteScreen({ navigation }: P<"Setup">) {
   const [step, setStep] = useState<SetupStep>("Name");
   const [saving, setSaving] = useState(false);
 
-  // Accumulate profile data as user moves through steps
   const profileData = useRef<{
     full_name?: string;
     gender?: string;
@@ -162,7 +178,6 @@ function SetupRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamL
 
   const go = (s: SetupStep) => setStep(s);
   const back = () => go(SETUP_ORDER[Math.max(SETUP_ORDER.indexOf(step) - 1, 0)]);
-  const skipToHome = () => navigation.replace("Home");
 
   const advanceTo = (nextStep: SetupStep) => go(nextStep);
 
@@ -173,7 +188,6 @@ function SetupRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamL
       const userId = savedProfile?.id;
 
       if (userId) {
-        // Sync local emergency contacts added during setup step 5 to Supabase
         const storedContacts = await contactStorageService.getStoredEmergencyContacts();
         if (storedContacts && storedContacts.length > 0) {
           const authHeader = await getAuthHeader();
@@ -273,7 +287,7 @@ function SetupRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamL
   return <SetupCompleteScreen onDone={handleSaveAndComplete} />;
 }
 
-function PermissionsRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Permissions">) {
+function PermissionsRouteScreen({ navigation }: P<"Permissions">) {
   const [index, setIndex] = useState(0);
   const skipToHome = () => navigation.replace("Home");
   const next = () => {
@@ -286,7 +300,7 @@ function PermissionsRouteScreen({ navigation }: NativeStackScreenProps<RootStack
   return <PermissionScreen key={index} index={index} onAllow={next} onSkip={skipToHome} />;
 }
 
-function HomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Home">) {
+function HomeRouteScreen({ navigation }: P<"Home">) {
   return (
     <HomeScreen
       onSos={() => navigation.navigate("Sos", { state: "active" })}
@@ -310,7 +324,7 @@ function HomeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamLi
   );
 }
 
-function SafetyRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Safety">) {
+function SafetyRouteScreen({ navigation }: P<"Safety">) {
   return (
     <SafetyScreen
       onTab={(t: TabKey) => {
@@ -328,7 +342,7 @@ function SafetyRouteScreen({ navigation }: NativeStackScreenProps<RootStackParam
   );
 }
 
-function SafetyModeRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "SafetyMode">) {
+function SafetyModeRouteScreen({ navigation }: P<"SafetyMode">) {
   return (
     <SafetyModeScreen
       onDone={() => navigation.navigate("Home")}
@@ -337,7 +351,7 @@ function SafetyModeRouteScreen({ navigation }: NativeStackScreenProps<RootStackP
   );
 }
 
-function HistoryRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "History">) {
+function HistoryRouteScreen({ navigation }: P<"History">) {
   return (
     <HistoryScreen
       onTab={(t: TabKey) => {
@@ -352,19 +366,17 @@ function HistoryRouteScreen({ navigation }: NativeStackScreenProps<RootStackPara
   );
 }
 
-function IncidentDetailRouteScreen({
-  route,
-  navigation,
-}: NativeStackScreenProps<RootStackParamList, "IncidentDetail">) {
+function IncidentDetailRouteScreen({ route, navigation }: P<"IncidentDetail">) {
+  const incidentId = route.params?.incidentId || route.params?.id || "";
   return (
     <IncidentDetailScreen
-      incidentId={route.params.incidentId}
+      incidentId={incidentId}
       onBack={() => navigation.goBack()}
     />
   );
 }
 
-function ProfileRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Profile">) {
+function ProfileRouteScreen({ navigation }: P<"Profile">) {
   return (
     <ProfileScreen
       onTab={(t: TabKey) => {
@@ -382,11 +394,11 @@ function ProfileRouteScreen({ navigation }: NativeStackScreenProps<RootStackPara
   );
 }
 
-function ManageContactsRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "ManageContacts">) {
+function ManageContactsRouteScreen({ navigation }: P<"ManageContacts">) {
   return <ManageContactsScreen onBack={() => navigation.goBack()} />;
 }
 
-function SosRouteScreen({ navigation, route }: NativeStackScreenProps<RootStackParamList, "Sos">) {
+function SosRouteScreen({ navigation, route }: P<"Sos">) {
   const sosState = route.params?.state ?? "active";
   return (
     <SosScreen
@@ -398,20 +410,91 @@ function SosRouteScreen({ navigation, route }: NativeStackScreenProps<RootStackP
   );
 }
 
-function ReportRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "Report">) {
+function ReportRouteScreen({ navigation }: P<"Report">) {
   return (
     <ReportScreen
       onBack={() => navigation.goBack()}
-      onSubmitDone={() => navigation.navigate("Home")}
+      onSubmitDone={() => navigation.replace("Home")}
+      onViewCommunity={() => navigation.replace("CommunityReports")}
     />
   );
 }
 
-function IncomingCallRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "IncomingCall">) {
+function CommunityReportsRouteScreen({ navigation }: P<"CommunityReports">) {
+  return <CommunityReportsScreen onBack={() => navigation.goBack()} onReportNew={() => navigation.navigate("Report")} />;
+}
+
+function NewIncidentRouteScreen({ navigation }: P<"NewIncident">) {
+  return <NewIncidentScreen onBack={() => navigation.goBack()} onCreated={(id) => navigation.replace("IncidentDetail", { id })} />;
+}
+
+function UploadEvidenceRouteScreen({ navigation, route }: P<"UploadEvidence">) {
+  return <UploadEvidenceScreen incidentId={route.params?.incidentId} onBack={() => navigation.goBack()} onDone={() => navigation.goBack()} />;
+}
+
+function EvidenceDetailRouteScreen({ navigation, route }: P<"EvidenceDetail">) {
+  return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
+}
+
+function IncomingCallRouteScreen({ navigation }: P<"IncomingCall">) {
   return <IncomingCallScreen />;
 }
 
-export function RootStack() {
+function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
+  return (
+    <AdminDashboardScreen
+      onBack={() => navigation.goBack()}
+      onUsers={() => navigation.navigate("AdminUsers")}
+      onIncidents={() => navigation.navigate("AdminIncidents")}
+    />
+  );
+}
+
+function AdminUsersRouteScreen({ navigation }: P<"AdminUsers">) {
+  return <AdminUsersScreen onBack={() => navigation.goBack()} />;
+}
+
+function AdminIncidentsRouteScreen({ navigation }: P<"AdminIncidents">) {
+  return <AdminIncidentsScreen onBack={() => navigation.goBack()} />;
+}
+
+function WebAdminNavigator({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <Stack.Navigator initialRouteName="AdminDashboard" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AdminDashboard">
+        {({ navigation }: P<"AdminDashboard">) => (
+          <AdminDashboardScreen
+            onUsers={() => navigation.navigate("AdminUsers")}
+            onIncidents={() => navigation.navigate("AdminIncidents")}
+            onSignOut={onSignOut}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="AdminUsers" component={AdminUsersRouteScreen} />
+      <Stack.Screen name="AdminIncidents" component={AdminIncidentsRouteScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function WebAdminApp() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadAdminSession().then((ok: boolean) => alive && setAuthed(ok));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (authed === null) return null;
+  if (!authed) return <AdminAuthScreen onAuthed={() => setAuthed(true)} />;
+  return (
+    <NavigationContainer>
+      <WebAdminNavigator onSignOut={() => void adminLogout().then(() => setAuthed(false))} />
+    </NavigationContainer>
+  );
+}
+
+function MobileApp() {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
 
   useEffect(() => {
@@ -440,25 +523,37 @@ export function RootStack() {
         <Stack.Screen name="Otp" component={OtpRouteScreen} />
         <Stack.Screen name="Setup" component={SetupRouteScreen} />
         <Stack.Screen name="Permissions" component={PermissionsRouteScreen} />
-        <Stack.Screen name="Home" component={HomeRouteScreen} />
-        <Stack.Screen name="Safety" component={SafetyRouteScreen} />
+        <Stack.Screen name="Home" component={HomeRouteScreen} options={{ animation: "none" }} />
+        <Stack.Screen name="Safety" component={SafetyRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="SafetyMode" component={SafetyModeRouteScreen} />
-        <Stack.Screen name="History" component={HistoryRouteScreen} />
-        <Stack.Screen name="Profile" component={ProfileRouteScreen} />
+        <Stack.Screen name="History" component={HistoryRouteScreen} options={{ animation: "none" }} />
+        <Stack.Screen name="Profile" component={ProfileRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Sos" component={SosRouteScreen} />
         <Stack.Screen name="SafeRoute" component={SafeRouteScreen} />
         <Stack.Screen name="NearbyHelp" component={NearbyHelpScreen} />
         <Stack.Screen name="Assistant" component={AssistantScreen} />
         <Stack.Screen name="Report" component={ReportRouteScreen} />
+        <Stack.Screen name="CommunityReports" component={CommunityReportsRouteScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
         <Stack.Screen name="ManageContacts" component={ManageContactsRouteScreen} />
+        <Stack.Screen name="NewIncident" component={NewIncidentRouteScreen} />
         <Stack.Screen name="IncidentDetail" component={IncidentDetailRouteScreen} />
+        <Stack.Screen name="UploadEvidence" component={UploadEvidenceRouteScreen} />
+        <Stack.Screen name="EvidenceDetail" component={EvidenceDetailRouteScreen} />
         <Stack.Screen name="HomeStub" component={HomeStubScreen} />
         <Stack.Screen name="IncomingCall" component={IncomingCallRouteScreen} />
         <Stack.Screen name="Wearable" component={WearableScreen} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardRouteScreen} />
+        <Stack.Screen name="AdminUsers" component={AdminUsersRouteScreen} />
+        <Stack.Screen name="AdminIncidents" component={AdminIncidentsRouteScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+export function RootStack() {
+  return Platform.OS === "web" ? <WebAdminApp /> : <MobileApp />;
+}
+

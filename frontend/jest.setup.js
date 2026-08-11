@@ -143,3 +143,4 @@ beforeEach(() => {
   global.fetch = jest.fn().mockRejectedValue(new Error("Network unavailable in tests"));
 });
 
+

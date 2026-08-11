@@ -1,4 +1,6 @@
+import { useCallback } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ChevronRight,
@@ -16,6 +18,7 @@ import { Card } from "../components/ds/Card";
 import { ListItem } from "../components/ds/ListItem";
 import { SectionHeader } from "../components/ds/SectionHeader";
 import { BottomNav, type TabKey } from "../components/app/BottomNav";
+import { useEmergencyContacts } from "../hooks/useEmergencyContacts";
 
 export type SafetyState = "default" | "elevated" | "loading";
 
@@ -35,15 +38,18 @@ const HELP_PLACES = [
   { id: "2", name: "Manipal Hospital Emergency", kind: "hospital", distance: "1.2 km", open: true },
 ];
 
-const PHONE_CONTACTS = [
-  { id: "c1", name: "Amma", relation: "Mother", phone: "+91 98765 43210", initials: "A" },
-  { id: "c2", name: "Meera", relation: "Sister", phone: "+91 98765 43211", initials: "M" },
-];
-
 const SAFETY_TIPS = [
   { id: "t1", title: "Share your live route early", body: "Sending journey tracking before getting into a cab gives your trusted contacts time to check in.", minutes: 2 },
   { id: "t2", title: "Enable Voice SOS key phrase", body: "Setting up a discreet keyword lets your phone activate emergency mode even inside your bag.", minutes: 3 },
 ];
+
+function formatRelationLabel(relation: string): string {
+  if (!relation) return "Other";
+  return relation
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
 
 function RiskDial({ score, tone }: { score: number; tone: "success" | "warning" | "brand" }) {
   const color = tone === "warning" ? colors.warning : tone === "success" ? colors.success : colors.primary;
@@ -79,6 +85,14 @@ export function SafetyScreen({
   onSos?: () => void;
 }) {
   const risk = RISK[state];
+  const { contacts, refreshContacts } = useEmergencyContacts();
+  const emergencyContacts = [...contacts].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshContacts();
+    }, [refreshContacts])
+  );
 
   return (
     <View style={styles.screen}>
@@ -171,13 +185,13 @@ export function SafetyScreen({
         <View style={styles.section}>
           <SectionHeader title="Emergency contacts" action="Manage" />
           <Card style={styles.contactsCard}>
-            {PHONE_CONTACTS.map((c) => (
+            {emergencyContacts.map((c) => (
               <ListItem
                 key={c.id}
                 onPress={onContacts}
-                icon={<Text style={styles.contactInitials}>{c.initials}</Text>}
+                icon={<Text style={styles.contactInitials}>{c.initials || c.name.substring(0, 2).toUpperCase()}</Text>}
                 title={c.name}
-                subtitle={`${c.relation} · ${c.phone}`}
+                subtitle={`${formatRelationLabel(c.relation)} · ${c.phone}`}
               />
             ))}
             <ListItem
@@ -299,3 +313,4 @@ const styles = StyleSheet.create({
   tipBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
   tipMinutes: { fontSize: 11, color: `${colors.mutedForeground}90`, marginTop: 6 },
 });
+

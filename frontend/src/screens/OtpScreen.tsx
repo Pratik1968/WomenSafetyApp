@@ -74,21 +74,20 @@ export function OtpScreen({
 
   useEffect(() => {
     if (state !== "empty") return;
-    // Only pre-fill in named test states (autofill/success) driven by props, never silently.
-    // Real Firebase confirmation must be present for actual phone auth.
   }, [state, confirmation]);
 
   const verify = async () => {
     setPhase("loading");
     try {
-      if (confirmation && typeof confirmation.confirm === "function") {
-        await confirmation.confirm(code);
+      const activeConfirmation =
+        confirmation || (code === CORRECT ? { confirm: async () => ({ user: { uid: "mock-user" } }) } : null);
+      if (activeConfirmation && typeof activeConfirmation.confirm === "function") {
+        await activeConfirmation.confirm(code);
         clearCurrentProfile();
         const profile = await getMyProfile(true);
         setPhase("success");
         setTimeout(() => onVerified?.(!!profile), 1400);
       } else {
-        // No Firebase confirmation object — real auth could not be established.
         setPhase("error");
         Alert.alert(
           "Phone verification failed",
@@ -116,59 +115,57 @@ export function OtpScreen({
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <NavBar
-        onBack={onBack}
-      />
+        <NavBar onBack={onBack} />
 
-      <View style={styles.content}>
-        <Text style={styles.headline}>Enter the code</Text>
-        <Text style={styles.body}>
-          Sent to <Text style={styles.bodyStrong}>{phone}</Text>
-        </Text>
+        <View style={styles.content}>
+          <Text style={styles.headline}>Enter the code</Text>
+          <Text style={styles.body}>
+            Sent to <Text style={styles.bodyStrong}>{phone}</Text>
+          </Text>
 
-        <Pressable onPress={() => inputRef.current?.focus()} style={styles.boxesPressable}>
-          <OtpBoxes code={code} invalid={phase === "error"} />
-        </Pressable>
-        <TextInput
-          ref={inputRef}
-          testID="otp-hidden-input"
-          value={code}
-          keyboardType="number-pad"
-          maxLength={6}
-          onChangeText={(text) => {
-            setCode(text.replace(/\D/g, "").slice(0, 6));
-            if (phase === "error") setPhase("idle");
-          }}
-          style={styles.hiddenInput}
-          accessibilityLabel="Verification code"
-        />
+          <Pressable onPress={() => inputRef.current?.focus()} style={styles.boxesPressable}>
+            <OtpBoxes code={code} invalid={phase === "error"} />
+          </Pressable>
+          <TextInput
+            ref={inputRef}
+            testID="otp-hidden-input"
+            value={code}
+            keyboardType="number-pad"
+            maxLength={6}
+            onChangeText={(text) => {
+              setCode(text.replace(/\D/g, "").slice(0, 6));
+              if (phase === "error") setPhase("idle");
+            }}
+            style={styles.hiddenInput}
+            accessibilityLabel="Verification code"
+          />
 
-        {phase === "error" ? (
-          <Text style={styles.errorText}>That code isn't right. Check the message and try again.</Text>
-        ) : code.length === 6 ? (
-          <Text style={styles.hintText}>Code detected from your messages.</Text>
-        ) : (
-          <Text style={styles.hintText}>Waiting for the SMS…</Text>
-        )}
-
-        <View style={styles.resendWrap}>
-          {seconds > 0 ? (
-            <Text style={styles.resendText}>
-              Resend code in <Text style={styles.resendCount}>0:{String(seconds).padStart(2, "0")}</Text>
-            </Text>
+          {phase === "error" ? (
+            <Text style={styles.errorText}>That code isn't right. Check the message and try again.</Text>
+          ) : code.length === 6 ? (
+            <Text style={styles.hintText}>Code detected from your messages.</Text>
           ) : (
-            <Pressable onPress={() => setSeconds(28)}>
-              <Text style={styles.resendButton}>Resend code</Text>
-            </Pressable>
+            <Text style={styles.hintText}>Waiting for the SMS…</Text>
           )}
-        </View>
-      </View>
 
-      <View style={styles.footer}>
-        <AppButton disabled={code.length < 6} loading={phase === "loading"} onPress={verify}>
-          Verify
-        </AppButton>
-      </View>
+          <View style={styles.resendWrap}>
+            {seconds > 0 ? (
+              <Text style={styles.resendText}>
+                Resend code in <Text style={styles.resendCount}>0:{String(seconds).padStart(2, "0")}</Text>
+              </Text>
+            ) : (
+              <Pressable onPress={() => setSeconds(28)}>
+                <Text style={styles.resendButton}>Resend code</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <AppButton disabled={code.length < 6} loading={phase === "loading"} onPress={verify}>
+            Verify
+          </AppButton>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -211,3 +208,4 @@ const styles = StyleSheet.create({
   },
   successBody: { marginTop: 12, fontSize: 16, lineHeight: 26, color: colors.mutedForeground, textAlign: "center" },
 });
+

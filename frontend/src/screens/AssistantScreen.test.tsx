@@ -23,3 +23,4 @@ describe("AssistantScreen", () => {
     expect(screen.getByText("Emergency Help")).toBeTruthy();
   });
 });
+

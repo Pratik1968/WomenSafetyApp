@@ -8,7 +8,7 @@ afterEach(() => {
 test("shows the permission for the given index", async () => {
   await render(<PermissionScreen index={1} />);
   expect(screen.getByText(PERMISSIONS[1].title)).toBeTruthy();
-  expect(screen.getByText("Permission 2 of 6")).toBeTruthy();
+  expect(screen.getByText(`Permission 2 of ${PERMISSIONS.length}`)).toBeTruthy();
 });
 
 test("Allow requests native permission and calls onAllow when granted", async () => {
@@ -57,3 +57,4 @@ test("Allowing notifications fetches the device push token and registers it with
     })
   );
 });
+
