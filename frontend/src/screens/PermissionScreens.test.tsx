@@ -57,3 +57,4 @@ test("Allowing notifications fetches the device push token and registers it with
     })
   );
 });
+

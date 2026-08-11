@@ -32,22 +32,24 @@
       "package": "com.nameisrk.aegiswomensafety",
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "READ_CONTACTS",
-        "WRITE_CONTACTS",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "FOREGROUND_SERVICE_MICROPHONE",
-        "POST_NOTIFICATIONS",
-        "WAKE_LOCK",
-        "VIBRATE",
-        "CAMERA",
-        "CALL_PHONE",
-        "SEND_SMS"
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.CALL_PHONE",
+        "android.permission.SEND_SMS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -68,6 +70,21 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
           "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident.",
           "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/splash-icon.png",
+          "color": "#ef4444"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+          "microphonePermission": "Allow Aegis to access the microphone to record audio evidence during an active SOS emergency.",
+          "recordAudioAndroid": true
         }
       ],
       [

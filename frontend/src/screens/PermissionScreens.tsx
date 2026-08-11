@@ -300,3 +300,4 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 15, lineHeight: 24, color: colors.mutedForeground },
   footer: { gap: 8, paddingHorizontal: 32, paddingBottom: 8 },
 });
+

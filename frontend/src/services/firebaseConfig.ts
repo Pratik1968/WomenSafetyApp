@@ -65,3 +65,4 @@ export async function getAuthHeader(forceRefresh = false): Promise<Record<string
   return passwordSessionToken ? { Authorization: `Bearer ${passwordSessionToken}` } : {};
 }
 
+

@@ -478,3 +478,4 @@ const styles = StyleSheet.create({
   cancelledFooter: { paddingHorizontal: 24, paddingBottom: 24, gap: 8 },
   dialogActions: { gap: 10, width: "100%" },
 });
+

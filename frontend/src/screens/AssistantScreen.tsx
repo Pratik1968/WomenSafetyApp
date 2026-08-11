@@ -7,6 +7,8 @@
  * - Minimal whitespace for maximum chat area
  * - Predefined templates for key safety workflows
  * - Natural, calm canned responses
+ *
+ * Architecture (providers, hooks, API) is unchanged.
  */
 
 import { useRef, useEffect, useState } from "react";
@@ -37,7 +39,7 @@ import {
   Info,
   ChevronRight,
 } from "lucide-react-native";
-import { colors, gradientBrand } from "../theme/tokens";
+import { colors, gradientBrand, radii } from "../theme/tokens";
 import { NavBar } from "../components/ds/NavBar";
 import { useAI } from "../hooks/useAI";
 import { useLocation } from "../modules/location";
@@ -53,12 +55,14 @@ interface SuggestionChip {
 }
 
 const SUGGESTION_CHIPS: SuggestionChip[] = [
-  { id: "safe-route",      label: "Safe Route",         prompt: "Safe Route",                                             icon: Navigation },
-  { id: "police",          label: "Nearby Police",      prompt: "Nearby Police",                                          icon: Shield },
-  { id: "hospital",        label: "Hospital",           prompt: "Hospital",                                               icon: Heart },
-  { id: "first-aid",       label: "First Aid",          prompt: "First Aid",                                              icon: Info },
-  { id: "emergency",       label: "Emergency Help",     prompt: "Emergency Help",                                         icon: Phone },
-  { id: "share-location",  label: "Share Location",     prompt: "Share Location",                                         icon: Navigation },
+  { id: "safe-route",   label: "Safe Route",         prompt: "What's the safest route home from my current location?",        icon: Navigation },
+  { id: "police",       label: "Nearby Police",      prompt: "Show me the nearest police station and contact number.",         icon: Shield },
+  { id: "hospital",     label: "Hospital",           prompt: "Find the nearest hospital or emergency medical center.",          icon: Heart },
+  { id: "report",       label: "Report Area",        prompt: "How do I report an unsafe area or suspicious activity?",          icon: AlertTriangle },
+  { id: "emergency",    label: "Emergency Help",     prompt: "I need emergency help right now. What should I do?",              icon: Phone },
+  { id: "safety-mode",  label: "Safety Mode",        prompt: "How does Safety Mode work and how do I start it?",               icon: Sparkles },
+  { id: "legal",        label: "Legal Rights",       prompt: "What are my legal rights if I feel unsafe or harassed?",          icon: Scale },
+  { id: "first-aid",    label: "First Aid",          prompt: "Give me basic first aid steps for a common emergency.",           icon: Info },
 ];
 
 // ─── Intent → icon + title mapping ────────────────────────────────────────────
@@ -106,7 +110,7 @@ function TypingIndicator() {
   );
 }
 
-// ─── AssistantScreen ─────────────────────────────────────────────────────────
+// ─── AssistantScreen ───────────────────────────────────────────────────────────
 
 export function AssistantScreen({ onBack }: { onBack?: () => void }) {
   const { messages: aiMessages, isThinking, networkError, sendChatMessage, clearHistory } = useAI();
@@ -158,7 +162,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={0}
     >
-      {/* ── Header ────────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <NavBar
         title="Ask Aegis"
         onBack={onBack}
@@ -176,25 +180,25 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         }
       />
 
-      {/* ── Location strip ────────────────────────────────────────────────── */}
+      {/* ── Location strip ─────────────────────────────────────────────────── */}
       {formattedAddress ? (
         <View style={styles.locationBar}>
           <MapPin size={12} color={colors.primary} />
           <Text style={styles.locationBarText} numberOfLines={1}>
             {formattedAddress}
           </Text>
-          <Text style={styles.locationBarBadge}>📍 Police 0.8km • 🏥 Hospital 1.2km</Text>
+          <Text style={styles.locationBarBadge}>🚔 Police 0.8km · 🏥 Hospital 1.2km</Text>
         </View>
       ) : null}
 
-      {/* ── Offline banner ───────────────────────────────────────────────── */}
+      {/* ── Offline banner ─────────────────────────────────────────────────── */}
       {networkError ? (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineBannerText}>⚡ Offline — cached responses in use</Text>
+          <Text style={styles.offlineBannerText}>⚠ Offline — cached responses in use</Text>
         </View>
       ) : null}
 
-      {/* ── Chat area ────────────────────────────────────────────────────── */}
+      {/* ── Chat area ──────────────────────────────────────────────────────── */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -205,7 +209,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         keyboardShouldPersistTaps="handled"
       >
         {!hasConversation ? (
-          /* ── Welcome state ──────────────────────────────────────────────── */
+          /* ── Welcome state ─────────────────────────────────────────────── */
           <View style={styles.welcomeWrap}>
             <LinearGradient
               colors={gradientBrand as unknown as [string, string, ...string[]]}
@@ -219,7 +223,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
             </Text>
           </View>
         ) : (
-          /* ── Messages list ──────────────────────────────────────────────── */
+          /* ── Messages list ─────────────────────────────────────────────── */
           <View style={styles.messagesList}>
             {aiMessages.map((m) => {
               if (m.role === "user") {
@@ -227,8 +231,6 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
                   <View key={m.id} style={styles.userRow}>
                     <LinearGradient
                       colors={gradientBrand as unknown as [string, string, ...string[]]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
                       style={styles.userBubble}
                     >
                       <Text style={styles.userBubbleText}>{m.content}</Text>
@@ -269,6 +271,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.actionChipsRow}
+                        keyboardShouldPersistTaps="handled"
                       >
                         {actions.map((action) => (
                           <Pressable
@@ -322,7 +325,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         </ScrollView>
       )}
 
-      {/* ── Composer ────────────────────────────────────────────────────── */}
+      {/* ── Composer ──────────────────────────────────────────────────────── */}
       <View style={styles.composerContainer}>
         <View style={styles.composerBar}>
           <TextInput

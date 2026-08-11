@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from './apiConfig';
+import { API_ENDPOINTS } from './apiEndpoints';
 import { logger } from '../utils/logger';
 
 const QUEUE_STORAGE_KEY = '@aegis_offline_request_queue';
@@ -114,6 +115,7 @@ export class NetworkMonitor {
 
       for (const item of queue) {
         try {
+          // Dynamic import to avoid circular dependency
           const { apiClient } = await import('./apiClient');
           await apiClient.post(item.endpoint, item.payload);
           logger.info(`Successfully synchronized offline ${item.type} request [${item.id}]`);
@@ -139,31 +141,34 @@ export class NetworkMonitor {
       return; // Skip background timer during tests
     }
 
-    let pollIntervalMs = 30000;
-
     const checkHealth = async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const url = `${API_CONFIG.baseURL}/health`;
-        const res = await fetch(url, { method: 'GET', signal: controller.signal });
-        clearTimeout(timeoutId);
+      const healthUrl = `${API_CONFIG.baseURL}${API_ENDPOINTS.HEALTH}`;
+      console.log(`🏥 [Health Check] Pinging: ${healthUrl}`);
 
-        if (res.ok) {
-          this.setOnlineStatus(true);
-          pollIntervalMs = 30000;
-        } else {
-          this.setOnlineStatus(false);
-          pollIntervalMs = 60000;
-        }
-      } catch (_err) {
+      try {
+        const { apiClient } = await import('./apiClient');
+        const response = await apiClient.get(API_ENDPOINTS.HEALTH, { timeout: API_CONFIG.timeout });
+        console.log(
+          `✅ [Health Check] Backend ONLINE | URL: ${healthUrl} | Status: ${response.status}`
+        );
+        this.setOnlineStatus(true);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : typeof err === 'object' && err !== null && 'message' in err
+              ? String((err as { message: unknown }).message)
+              : String(err);
+        console.error(`❌ [Health Check] Backend OFFLINE | URL: ${healthUrl} | Error: ${message}`);
         this.setOnlineStatus(false);
-        pollIntervalMs = 60000;
       }
     };
 
+    // Run initial health check immediately on startup
     checkHealth();
-    this.heartbeatTimer = setInterval(checkHealth, pollIntervalMs);
+
+    // Ping health endpoint every 30 seconds
+    this.heartbeatTimer = setInterval(checkHealth, 30000);
   }
 }
 

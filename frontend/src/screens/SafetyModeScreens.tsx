@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import {
@@ -35,6 +35,7 @@ import { SectionHeader } from "../components/ds/SectionHeader";
 import { SelectRow } from "../components/ds/SelectRow";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { Aurora } from "../components/ds/Aurora";
+import { NativeEmergencyModule } from "../modules/EmergencyModule";
 import { useVoiceState } from "../context/VoiceContext";
 import { useJourney } from "../context/JourneyContext";
 import { useEmergencyContacts } from "../hooks/useEmergencyContacts";
@@ -293,22 +294,30 @@ export function JourneyContactsScreen({
 /* Voice Detection Card for Step 4 */
 export function SafetyModeVoiceCard() {
   const {
+    recognitionState,
     isListening,
     recognizedText,
     partialText,
-    volumeLevel: audioLevel,
     currentLanguage,
+    volumeLevel,
     speechError,
     startListening,
     stopListening,
     changeLanguage,
   } = useVoiceState();
 
-  const { emergencyActive: isDetected, latestEmergencyEvent } = useJourney();
+  const { emergencyActive: _isDetected, latestEmergencyEvent } = useJourney();
+
+  useEffect(() => {
+    console.log("Voice screen mounted");
+  }, []);
+
 
   const [showLanguages, setShowLanguages] = useState(false);
 
   const activeTranscript = recognizedText || partialText;
+  const isDetected = _isDetected || !!latestEmergencyEvent;
+
 
   return (
     <Card style={styles.voiceCard}>
@@ -317,29 +326,37 @@ export function SafetyModeVoiceCard() {
           <Volume2 size={18} color={isListening ? colors.primary : colors.mutedForeground} />
           <Text style={styles.voiceTitle}>Background Voice Detection</Text>
         </View>
-        <Badge tone={isListening ? "success" : "neutral"}>
-          {isListening ? "Listening" : "Standby"}
-        </Badge>
+        {isDetected ? (
+          <Badge tone="emergency">Keyword Detected</Badge>
+        ) : isListening ? (
+          <Badge tone="success">Listening</Badge>
+        ) : recognitionState === "PROCESSING" ? (
+          <Badge tone="warning">Processing...</Badge>
+        ) : (
+          <Badge tone="neutral">Standby</Badge>
+        )}
       </View>
 
       <Text style={styles.voiceSub}>
         Listens for distress keywords like <Text style={{ fontWeight: "700" }}>"Help", "Bachao", "Save me"</Text> to trigger an auto-alert.
       </Text>
 
-      {isListening && (
-        <View style={styles.transcriptBox}>
-          <Text style={styles.transcriptLabel}>Live Audio Transcript</Text>
-          <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
-            {activeTranscript ? `"${activeTranscript}"` : "Say emergency keywords to trigger SOS..."}
-          </Text>
+      <View style={styles.transcriptBox}>
+        <Text style={styles.transcriptLabel}>Live Audio Transcript</Text>
+        <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
+          {activeTranscript ? `"${activeTranscript}"` : "Say emergency keywords to trigger SOS..."}
+        </Text>
+
+        {isListening && (
           <View style={styles.volumeRow}>
+            <Volume2 size={14} color={colors.primary} />
             <View style={styles.volumeTrack}>
-              <View style={[styles.volumeFill, { width: `${Math.min(100, Math.max(5, (audioLevel + 2) * 20))}%` }]} />
+              <View style={[styles.volumeFill, { width: `${Math.min(100, volumeLevel * 100)}%` }]} />
             </View>
-            <Text style={styles.volumeText}>{audioLevel > -2 ? "Audio Active" : "Silent"}</Text>
+            <Text style={styles.volumeText}>{Math.round(volumeLevel * 100)}%</Text>
           </View>
-        </View>
-      )}
+        )}
+      </View>
 
       {isDetected && latestEmergencyEvent && (
         <View style={styles.detectedBox}>
@@ -349,7 +366,7 @@ export function SafetyModeVoiceCard() {
               Keyword Detected: "{latestEmergencyEvent.detectedKeyword}"
             </Text>
             <Text style={styles.detectedDetail}>
-              Confidence: {Math.round((latestEmergencyEvent.confidence || 0) * 100)}% • Language: {latestEmergencyEvent.language || currentLanguage}
+              Confidence: {Math.round((latestEmergencyEvent.confidence || 0) * 100)}% · Language: {latestEmergencyEvent.language || currentLanguage}
             </Text>
           </View>
         </View>
@@ -465,7 +482,6 @@ export function JourneyActiveScreen({
   onSos?: () => void;
 }) {
   const offRoute = state !== "active";
-
   const { emergencyActive, latestEmergencyEvent, endJourney } = useJourney();
 
   useEffect(() => {
@@ -475,6 +491,7 @@ export function JourneyActiveScreen({
   }, [emergencyActive]);
 
   useEffect(() => {
+    let isActive = true;
     (async () => {
       try {
         if (typeof Location?.requestForegroundPermissionsAsync === "function") {
@@ -483,10 +500,19 @@ export function JourneyActiveScreen({
             await Location.requestBackgroundPermissionsAsync();
           }
         }
+        if (isActive && NativeEmergencyModule?.startForegroundNotification) {
+          await NativeEmergencyModule.startForegroundNotification();
+        }
       } catch (err) {
-        console.warn("Safety mode location permission request error:", err);
+        console.warn("Safety mode foreground/location request error:", err);
       }
     })();
+    return () => {
+      isActive = false;
+      if (NativeEmergencyModule?.stopForegroundNotification) {
+        NativeEmergencyModule.stopForegroundNotification().catch((e: unknown) => console.warn(e));
+      }
+    };
   }, []);
 
   const handleEnd = () => {
@@ -568,7 +594,7 @@ export function JourneyActiveScreen({
         </Pressable>
         <Pressable onPress={handleEnd} style={[styles.activeActionBtn, styles.activeActionBtnArrived]}>
           <Check size={20} color={colors.foreground} />
-          <Text style={styles.activeActionBtnArrivedText}>I've arrived</Text>
+          <Text style={styles.activeActionBtnArrivedText}>Arrived</Text>
         </Pressable>
       </View>
 
@@ -713,10 +739,11 @@ export function SafetyModeScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  stepHeaderWrap: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
-  stepHeaderTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 16 },
-  stepHeaderBody: { fontSize: 15, color: colors.mutedForeground, marginTop: 6, lineHeight: 22 },
-  searchWrap: { paddingHorizontal: 20, marginBottom: 16 },
+  summaryScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
+  stepHeaderWrap: { paddingHorizontal: 32, paddingTop: 12, paddingBottom: 16 },
+  stepHeaderTitle: { fontSize: 24, fontWeight: "700", color: colors.foreground, marginTop: 16, letterSpacing: -0.2 },
+  stepHeaderBody: { fontSize: 14, color: colors.mutedForeground, marginTop: 6, lineHeight: 20 },
+  searchWrap: { paddingHorizontal: 32, marginBottom: 8 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -732,38 +759,25 @@ const styles = StyleSheet.create({
   textForeground: { color: colors.foreground, fontWeight: "500" },
   textMuted: { color: colors.mutedForeground },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 32, paddingBottom: 24 },
   placesList: { gap: 10, marginTop: 8 },
   placeItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl,
-    padding: 16,
-    gap: 14,
+    borderRadius: radii.xl2,
+    padding: 14,
+    gap: 12,
   },
   placeItemPicked: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
-  placeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  placeIcon: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   placeText: { flex: 1 },
   placeTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   placeDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
-  checkBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  transportList: { gap: 12 },
+  checkBadge: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  transportList: { gap: 12, marginTop: 16 },
   transportItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -775,21 +789,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   transportItemSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
-  transportIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  transportIconSelected: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  transportIcon: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  transportIconSelected: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   transportText: { flex: 1 },
   transportLabel: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   transportDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
@@ -802,226 +803,95 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl,
+    borderRadius: radii.xl2,
     padding: 14,
-    gap: 12,
+    gap: 14,
   },
-  contactAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  contactInitials: { fontSize: 14, fontWeight: "700", color: colors.primary },
+  contactAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: `${colors.primary}15`, alignItems: "center", justifyContent: "center" },
+  contactInitials: { fontSize: 15, fontWeight: "700", color: colors.primary },
   contactText: { flex: 1 },
-  contactName: { fontSize: 15, fontWeight: "600", color: colors.foreground },
+  contactName: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   contactRelation: { fontSize: 13, color: colors.mutedForeground },
-  checkboxOn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxOff: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  footer: { paddingHorizontal: 20, paddingBottom: 24 },
-  footerStack: { paddingHorizontal: 20, paddingBottom: 24, gap: 8 },
-  consentHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  consentHeading: { fontSize: 32, fontWeight: "800", color: colors.foreground },
-  consentGradientHeading: { fontSize: 32, fontWeight: "800", color: colors.primary },
+  checkboxOn: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  checkboxOff: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.border },
+  voiceCard: { padding: 16, marginBottom: 16 },
+  voiceHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  voiceTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  voiceTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
+  voiceSub: { fontSize: 13, color: colors.mutedForeground, lineHeight: 18, marginBottom: 12 },
+  transcriptBox: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: 12, marginBottom: 12 },
+  transcriptLabel: { fontSize: 11, fontWeight: "600", color: colors.mutedForeground, textTransform: "uppercase" },
+  transcriptText: { fontSize: 14, color: colors.foreground, marginTop: 4, fontStyle: "italic" },
+  transcriptPlaceholder: { color: colors.mutedForeground, fontStyle: "normal" },
+  volumeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  volumeTrack: { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: "hidden" },
+  volumeFill: { height: "100%", backgroundColor: colors.primary },
+  volumeText: { fontSize: 11, color: colors.mutedForeground, minWidth: 28 },
+  detectedBox: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: `${colors.emergency}15`, borderWidth: 1, borderColor: colors.emergency, borderRadius: radii.md, padding: 12, marginBottom: 12 },
+  detectedTextWrap: { flex: 1 },
+  detectedTitle: { fontSize: 14, fontWeight: "700", color: colors.emergency },
+  detectedDetail: { fontSize: 12, color: colors.foreground, marginTop: 2 },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  errorText: { fontSize: 13, color: colors.emergency },
+  langToggle: { marginBottom: 12 },
+  langToggleText: { fontSize: 13, color: colors.mutedForeground },
+  langValue: { fontWeight: "600", color: colors.foreground },
+  langList: { gap: 4, marginBottom: 12 },
+  consentHeader: { paddingHorizontal: 32, paddingTop: 16, paddingBottom: 8 },
+  consentHeading: { fontSize: 32, fontWeight: "800", color: colors.foreground, letterSpacing: -0.5 },
+  consentGradientHeading: { fontSize: 32, fontWeight: "800", color: colors.primary, letterSpacing: -0.5 },
   consentSub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, lineHeight: 22 },
-  promisesList: { gap: 12 },
+  promisesList: { gap: 12, marginTop: 12 },
   promiseCard: { flexDirection: "row", gap: 14, padding: 16 },
-  promiseIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  promiseIconWrap: { width: 36, height: 36, borderRadius: 12, backgroundColor: `${colors.primary}15`, alignItems: "center", justifyContent: "center" },
   promiseTextWrap: { flex: 1 },
   promiseTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   promiseBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
-  activeHeader: { paddingHorizontal: 20, paddingTop: 20, alignItems: "center" },
-  activePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${colors.success}15`,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
-  },
+  activeHeader: { paddingHorizontal: 32, paddingTop: 16, paddingBottom: 8, alignItems: "center" },
+  activePill: { flexDirection: "row", alignItems: "center", backgroundColor: `${colors.primary}15`, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   activePillWarning: { backgroundColor: `${colors.warning}20` },
-  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
+  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   activeDotWarning: { backgroundColor: colors.warning },
   activePillText: { fontSize: 13, fontWeight: "600", color: colors.foreground },
-  mapContainerStub: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.xl2,
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 16,
-    gap: 6,
-  },
+  mapContainerStub: { height: 160, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.xl2, alignItems: "center", justifyContent: "center", gap: 6, marginVertical: 12 },
   mapStubHeading: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   mapStubDetail: { fontSize: 13, color: colors.mutedForeground },
-  offRouteBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${colors.warning}15`,
-    borderWidth: 1,
-    borderColor: `${colors.warning}40`,
-    borderRadius: radii.xl,
-    padding: 14,
-    gap: 12,
-    marginBottom: 16,
-  },
+  offRouteBox: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: `${colors.warning}18`, borderWidth: 1, borderColor: colors.warning, borderRadius: radii.xl, padding: 14, marginBottom: 12 },
   offRouteText: { flex: 1 },
   offRouteTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  offRouteBody: { fontSize: 13, color: colors.mutedForeground },
-  escalatingBox: {
-    backgroundColor: `${colors.emergency}15`,
-    borderWidth: 1,
-    borderColor: `${colors.emergency}40`,
-    borderRadius: radii.xl,
-    padding: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
+  offRouteBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
+  escalatingBox: { backgroundColor: `${colors.emergency}15`, borderWidth: 1, borderColor: colors.emergency, borderRadius: radii.xl2, padding: 16, gap: 10, marginBottom: 12 },
   warningRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   escalatingTitle: { fontSize: 16, fontWeight: "700", color: colors.emergency },
-  escalatingBody: { fontSize: 13, color: colors.foreground },
-  escalatingButtons: { flexDirection: "row", gap: 10, marginTop: 8 },
-  journeyMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  escalatingBody: { fontSize: 13, color: colors.foreground, lineHeight: 18 },
+  escalatingButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
+  journeyMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 12 },
   journeyMetaTitle: { fontSize: 18, fontWeight: "700", color: colors.foreground },
   metricsRow: { flexDirection: "row", gap: 10, marginTop: 16 },
-  metricCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.xl,
-    padding: 12,
-    alignItems: "center",
-    gap: 4,
-  },
+  metricCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.xl, padding: 12, alignItems: "center", gap: 4 },
   metricValue: { fontSize: 16, fontWeight: "700", color: colors.foreground },
-  metricLabel: { fontSize: 11, color: colors.mutedForeground },
-  activeActionsRow: { flexDirection: "row", paddingHorizontal: 20, paddingBottom: 20, gap: 12 },
-  activeActionBtn: {
-    flex: 1,
-    height: 54,
-    backgroundColor: colors.emergency,
-    borderRadius: radii.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  activeActionBtnArrived: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  metricLabel: { fontSize: 12, color: colors.mutedForeground },
+  activeActionsRow: { flexDirection: "row", gap: 12, paddingHorizontal: 32, paddingBottom: 24 },
+  activeActionBtn: { flex: 1, height: 52, borderRadius: radii.xl, backgroundColor: colors.emergency, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   activeActionBtnSosText: { fontSize: 16, fontWeight: "700", color: colors.emergencyForeground },
-  activeActionBtnArrivedText: { fontSize: 16, fontWeight: "700", color: colors.foreground },
-  summaryScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
+  activeActionBtnArrived: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  activeActionBtnArrivedText: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  emergencyOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.75)", alignItems: "center", justifyContent: "center", padding: 24 },
+  emergencyOverlayCard: { backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.emergency, borderRadius: radii.xl2, padding: 24, width: "100%", alignItems: "center", gap: 12 },
+  emergencyOverlayIconRow: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${colors.emergency}20`, alignItems: "center", justifyContent: "center" },
+  emergencyOverlayTitle: { fontSize: 22, fontWeight: "800", color: colors.emergency },
+  emergencyOverlayKeyword: { fontSize: 16, fontWeight: "700", color: colors.foreground },
+  emergencyOverlayDetail: { fontSize: 13, color: colors.mutedForeground },
+  emergencyOverlayContacts: { fontSize: 14, color: colors.foreground, textAlign: "center" },
+  emergencyOverlaySosBtn: { width: "100%", marginTop: 8 },
+  emergencyOverlayEndBtn: { width: "100%" },
   summaryContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   summaryTitle: { fontSize: 26, fontWeight: "700", color: colors.foreground, marginTop: 20, textAlign: "center" },
   summarySub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 8, lineHeight: 22 },
   summaryCard: { width: "100%", marginTop: 24, padding: 20 },
-  summaryMetricsGrid: { flexDirection: "row", justifyContent: "space-around", textAlign: "center" },
+  summaryMetricsGrid: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
   summaryMetricValue: { fontSize: 18, fontWeight: "700", color: colors.foreground, textAlign: "center" },
   summaryMetricLabel: { fontSize: 12, color: colors.mutedForeground, textAlign: "center", marginTop: 2 },
-  voiceCard: { gap: 12, marginBottom: 16 },
-  voiceHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  voiceTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  voiceTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
-  voiceSub: { fontSize: 13, color: colors.mutedForeground, lineHeight: 18 },
-  transcriptBox: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: 12, gap: 6 },
-  transcriptLabel: { fontSize: 12, fontWeight: "600", color: colors.mutedForeground, textTransform: "uppercase", letterSpacing: 0.5 },
-  transcriptText: { fontSize: 15, fontWeight: "500", color: colors.foreground, fontStyle: "italic" },
-  transcriptPlaceholder: { color: colors.mutedForeground, fontStyle: "normal" },
-  volumeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  volumeTrack: { flex: 1, height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: "hidden" },
-  volumeFill: { height: "100%", backgroundColor: colors.primary, borderRadius: 3 },
-  volumeText: { fontSize: 12, fontWeight: "600", color: colors.primary, minWidth: 32, textAlign: "right" },
-  detectedBox: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: `${colors.emergency}15`, borderWidth: 1, borderColor: `${colors.emergency}40`, borderRadius: radii.lg, padding: 12 },
-  detectedTextWrap: { flex: 1 },
-  detectedTitle: { fontSize: 14, fontWeight: "700", color: colors.emergency },
-  detectedDetail: { fontSize: 12, color: colors.foreground, marginTop: 2 },
-  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: `${colors.emergency}10`, padding: 10, borderRadius: radii.md },
-  errorText: { fontSize: 13, color: colors.emergency },
-  langToggle: { paddingVertical: 4 },
-  langToggleText: { fontSize: 13, color: colors.mutedForeground },
-  langValue: { fontWeight: "600", color: colors.primary },
-  langList: { gap: 8, marginVertical: 4 },
-
-  // ── Emergency Active Overlay ───────────────────────────────────────────────
-  emergencyOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    zIndex: 999,
-  },
-  emergencyOverlayCard: {
-    width: "100%",
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl2,
-    borderWidth: 2,
-    borderColor: colors.emergency,
-    padding: 24,
-    gap: 10,
-    alignItems: "center",
-  },
-  emergencyOverlayIconRow: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: `${colors.emergency}20`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  emergencyOverlayTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.emergency,
-    textAlign: "center",
-  },
-  emergencyOverlayKeyword: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.foreground,
-    textAlign: "center",
-  },
-  emergencyOverlayDetail: {
-    fontSize: 13,
-    color: colors.mutedForeground,
-    textAlign: "center",
-  },
-  emergencyOverlayContacts: {
-    fontSize: 14,
-    color: colors.foreground,
-    textAlign: "center",
-    fontWeight: "500",
-    marginTop: 4,
-  },
-  emergencyOverlaySosBtn: { width: "100%", marginTop: 8 },
-  emergencyOverlayEndBtn: { width: "100%" },
+  footer: { paddingHorizontal: 20, paddingBottom: 24 },
+  footerStack: { paddingHorizontal: 20, paddingBottom: 24, gap: 8 },
 });

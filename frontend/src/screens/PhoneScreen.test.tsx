@@ -68,3 +68,4 @@ test("selecting a country updates the dial code and closes the sheet", async () 
   expect(screen.getByText("+1")).toBeTruthy();
   expect(screen.queryByPlaceholderText("Search")).toBeNull();
 });
+

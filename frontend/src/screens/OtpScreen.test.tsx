@@ -30,7 +30,8 @@ test("counts the resend timer down and offers a resend button at zero", async ()
 test("verifies a correct autofilled code and calls onVerified after the success screen", async () => {
   jest.useFakeTimers();
   const onVerified = jest.fn();
-  await render(<OtpScreen state="autofill" onVerified={onVerified} />);
+  const confirmation = { confirm: jest.fn().mockResolvedValue({ user: { uid: "test-user-id" } }) };
+  await render(<OtpScreen state="autofill" onVerified={onVerified} confirmation={confirmation} />);
 
   await act(async () => {
     fireEvent.press(screen.getByText("Verify"));
@@ -69,3 +70,4 @@ test("shows an error for a wrong code and clears it once the user edits the code
   expect(screen.queryByText("That code isn't right. Check the message and try again.")).toBeNull();
   jest.useRealTimers();
 });
+

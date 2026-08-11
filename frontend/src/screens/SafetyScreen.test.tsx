@@ -55,3 +55,4 @@ describe("SafetyScreen", () => {
     expect(onSafeRoute).toHaveBeenCalledTimes(1);
   });
 });
+
