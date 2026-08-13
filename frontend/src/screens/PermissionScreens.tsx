@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Animated, Easing, StyleSheet, Platform } from "react-native";
+import { View, Text, Animated, Easing, StyleSheet, Platform, PermissionsAndroid } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Users, Bluetooth, Bell, Camera as CameraIcon, Footprints, MapPin, Mic as MicIcon, ShieldCheck, type LucideIcon } from "lucide-react-native";
+import { Users, Bluetooth, Bell, Camera as CameraIcon, Footprints, MapPin, Mic as MicIcon, Phone, MessageSquare, ShieldCheck, type LucideIcon } from "lucide-react-native";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import * as Contacts from "expo-contacts/legacy";
@@ -13,7 +13,7 @@ import { AppButton } from "../components/ds/AppButton";
 import { colors } from "../theme/tokens";
 import { deviceRegistrationService } from "../services/deviceRegistrationService";
 
-export type PermissionKey = "location" | "notifications" | "contacts" | "activity" | "microphone" | "camera" | "bluetooth";
+export type PermissionKey = "location" | "notifications" | "contacts" | "activity" | "microphone" | "camera" | "bluetooth" | "send_sms" | "call_phone";
 export type PermissionState = "ask" | "requesting" | "granted" | "denied";
 
 export type PermissionSpec = {
@@ -68,6 +68,28 @@ export const PERMISSIONS: PermissionSpec[] = [
     systemBody: "Allow Aegis to access the microphone?",
     deniedBody: "Audio evidence will not be recorded during an SOS.",
   },
+  {
+    key: "send_sms" as PermissionKey,
+    icon: MessageSquare,
+    title: "Send Emergency SMS",
+    reason: "To silently alert your contacts the moment you trigger SOS.",
+    detail:
+      "When SOS is activated, Aegis sends an SMS with your GPS location to all emergency contacts immediately — without opening any SMS app or requiring you to tap Send. This is the fastest way to get a message out.",
+    systemBody: "Allow Aegis to send SMS messages?",
+    deniedBody:
+      "Without this permission, emergency SMS alerts cannot be sent automatically. You will need to send them manually.",
+  },
+  {
+    key: "call_phone" as PermissionKey,
+    icon: Phone,
+    title: "Place Emergency Calls",
+    reason: "To auto-dial your primary contact when SOS activates.",
+    detail:
+      "Aegis auto-calls your primary emergency contact when SOS is triggered — no need to unlock your phone or navigate to the dialer. The call is placed immediately after the SMS is sent.",
+    systemBody: "Allow Aegis to make phone calls?",
+    deniedBody:
+      "Without this permission, Aegis cannot auto-dial your emergency contact. You will need to call manually.",
+  },
 ];
 
 // Feature-Based Just-In-Time Permissions (Ask Later when feature is used)
@@ -104,7 +126,6 @@ export const JUST_IN_TIME_PERMISSIONS: Record<string, PermissionSpec> = {
 async function fetchAndRegisterPushToken(): Promise<void> {
   try {
     if (Platform.OS === "android" && typeof Notifications?.setNotificationChannelAsync === "function") {
-      // Required on Android 13+ before a device push token can be issued.
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
         importance: Notifications.AndroidImportance.MAX,
@@ -151,9 +172,29 @@ export async function requestNativePermission(key: PermissionKey): Promise<boole
         return status === "granted";
       }
     } else if (key === "microphone") {
-      if (typeof ExpoCamera?.requestMicrophonePermissionsAsync === "function") {
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: "Microphone Access Required",
+            message: "Aegis requires microphone access to record audio evidence during emergency alerts and for voice activation.",
+            buttonPositive: "Allow",
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } else if (typeof ExpoCamera?.requestMicrophonePermissionsAsync === "function") {
         const { status } = await ExpoCamera.requestMicrophonePermissionsAsync();
         return status === "granted";
+      }
+    } else if (key === "send_sms") {
+      if (Platform.OS === "android") {
+        const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.SEND_SMS);
+        return res === PermissionsAndroid.RESULTS.GRANTED;
+      }
+    } else if (key === "call_phone") {
+      if (Platform.OS === "android") {
+        const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CALL_PHONE);
+        return res === PermissionsAndroid.RESULTS.GRANTED;
       }
     }
   } catch (err) {
@@ -259,3 +300,4 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 15, lineHeight: 24, color: colors.mutedForeground },
   footer: { gap: 8, paddingHorizontal: 32, paddingBottom: 8 },
 });
+

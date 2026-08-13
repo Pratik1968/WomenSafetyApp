@@ -3,6 +3,16 @@ import { render, screen, fireEvent, act, cleanup } from "@testing-library/react-
 import { NavigationContainer } from "@react-navigation/native";
 import { SafetyScreen } from "./SafetyScreen";
 
+jest.mock("../hooks/useEmergencyContacts", () => ({
+  useEmergencyContacts: () => ({
+    contacts: [
+      { id: "c1", name: "Amma", relation: "MOTHER", phone: "+91 98765 43210", initials: "A" },
+      { id: "c2", name: "Meera", relation: "SISTER", phone: "+91 98765 43211", initials: "M" },
+    ],
+    refreshContacts: jest.fn(),
+  }),
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -45,3 +55,4 @@ describe("SafetyScreen", () => {
     expect(onSafeRoute).toHaveBeenCalledTimes(1);
   });
 });
+
