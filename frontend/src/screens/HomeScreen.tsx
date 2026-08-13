@@ -7,7 +7,6 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -24,7 +23,6 @@ import {
   Clock,
   MapPin,
   PhoneCall,
-  HeartHandshake,
 } from "lucide-react-native";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
@@ -44,6 +42,11 @@ import {
 import type { SOSTriggerSource } from "../services/sosOrchestratorService";
 
 export type HomeState = "default" | "monitoring" | "caution" | "loading";
+
+const USER = {
+  firstName: "Aisha",
+  initials: "AP",
+};
 
 const QUICK_ACTIONS = [
   { label: "Safe Route", icon: RouteIcon },
@@ -128,33 +131,7 @@ export function HomeScreen({
   notificationPermissionGranted?: boolean;
 }) {
   const [pressed, setPressed] = useState(false);
-  const [profile, setProfile] = useState<{ full_name?: string } | null>(null);
   const loading = state === "loading";
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      const data = await getMyProfile();
-      if (isMounted && data) {
-        setProfile(data);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const firstName = profile?.full_name ? profile.full_name.trim().split(/\s+/)[0] : "User";
-  const initials = profile?.full_name
-    ? profile.full_name
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((n) => n[0])
-        .join("")
-        .substring(0, 2)
-        .toUpperCase()
-    : "U";
 
   // ── Countdown overlay state ───────────────────────────────────
   const [countdownVisible, setCountdownVisible] = useState(false);
@@ -224,11 +201,11 @@ export function HomeScreen({
 
       <View style={styles.header}>
         <LinearGradient colors={gradientBrand as unknown as [string, string, ...string[]]} style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+          <Text style={styles.avatarText}>{USER.initials}</Text>
         </LinearGradient>
         <View style={styles.headerText}>
           <Text style={styles.greeting}>Good evening,</Text>
-          <Text style={styles.userName}>{firstName}</Text>
+          <Text style={styles.userName}>{USER.firstName}</Text>
         </View>
         <Pressable
           onPress={onNotifications}
@@ -294,46 +271,6 @@ export function HomeScreen({
           </View>
           <ChevronRight size={18} color={colors.mutedForeground} />
         </Pressable>
-
-        {/* 1-Tap Emergency Helplines */}
-        <View style={styles.section}>
-          <SectionHeader title="Emergency Helplines" />
-          <View style={styles.helplinesRow}>
-            <Pressable
-              style={styles.helplineCard}
-              onPress={() => Linking.openURL("tel:1091")}
-              accessibilityLabel="Call Women Helpline 1091"
-            >
-              <View style={[styles.helplineIconWrap, { backgroundColor: "#ec489915" }]}>
-                <HeartHandshake size={22} color="#ec4899" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.helplineTitle}>Women Helpline</Text>
-                <Text style={styles.helplineNumber}>1091</Text>
-              </View>
-              <View style={styles.callBadge}>
-                <PhoneCall size={14} color={colors.primaryForeground} />
-              </View>
-            </Pressable>
-
-            <Pressable
-              style={styles.helplineCard}
-              onPress={() => Linking.openURL("tel:112")}
-              accessibilityLabel="Call Police Helpline 112"
-            >
-              <View style={[styles.helplineIconWrap, { backgroundColor: `${colors.emergency}15` }]}>
-                <Siren size={22} color={colors.emergency} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.helplineTitle}>Police Helpline</Text>
-                <Text style={styles.helplineNumber}>112 / 100</Text>
-              </View>
-              <View style={[styles.callBadge, { backgroundColor: colors.emergency }]}>
-                <PhoneCall size={14} color={colors.primaryForeground} />
-              </View>
-            </Pressable>
-          </View>
-        </View>
 
         {/* Quick Actions Grid */}
         <View style={styles.section}>
@@ -499,35 +436,6 @@ const styles = StyleSheet.create({
   safetyModeTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   safetyModeSub: { fontSize: 13, color: colors.mutedForeground },
   section: { marginBottom: 24 },
-  helplinesRow: { flexDirection: "row", gap: 12 },
-  helplineCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.xl,
-    padding: 12,
-    gap: 10,
-  },
-  helplineIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  helplineTitle: { fontSize: 13, fontWeight: "600", color: colors.foreground },
-  helplineNumber: { fontSize: 14, fontWeight: "700", color: colors.primary, marginTop: 1 },
-  callBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionItem: {
     width: "31%",

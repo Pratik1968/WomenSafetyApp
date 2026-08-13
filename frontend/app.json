@@ -56,8 +56,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
       [
         "expo-contacts",
         {
@@ -92,7 +90,9 @@
         {
           "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ]
   }
 }
