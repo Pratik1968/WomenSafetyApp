@@ -358,4 +358,3 @@ CREATE POLICY incident_timeline_owner_insert ON public.incident_timeline
       WHERE i.id = incident_id AND i.user_id = auth.uid()
     )
   );
-

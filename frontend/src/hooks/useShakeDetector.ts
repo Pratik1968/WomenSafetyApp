@@ -1,51 +1,33 @@
-import { useEffect, useRef } from "react";
-import { Accelerometer } from "expo-sensors";
+import { useEffect } from "react";
+import {
+  addShakeTriggerListener,
+  startShakeDetection,
+  stopShakeDetection,
+} from "../services/sosNativeService";
 
 type Options = {
-  threshold?: number; // magnitude threshold to consider a strong movement
-  windowMs?: number; // duration to observe strong movement
-  requiredCount?: number; // number of strong samples in the window to trigger
+  threshold?: number;
+  windowMs?: number;
+  requiredCount?: number;
 };
 
 /**
- * Simple shake detector using the accelerometer.
- * Triggers when `requiredCount` samples exceed `threshold` within `windowMs` milliseconds.
+ * Hook to listen for shake trigger events from native ShakeModule / ShakeDetectionService.
  */
-export function useShakeDetector(onShake: () => void, opts: Options = {}) {
-  const { threshold = 1.6, windowMs = 2000, requiredCount = 8 } = opts;
-  const bufferRef = useRef<number[]>([]);
-  const lastTriggerRef = useRef<number>(0);
-
+export function useShakeDetector(onShake: () => void, _opts: Options = {}) {
   useEffect(() => {
-    let mounted = true;
-    Accelerometer.setUpdateInterval(100);
-
-    const sub = Accelerometer.addListener((d) => {
-      if (!mounted) return;
-      const mag = Math.sqrt((d.x || 0) ** 2 + (d.y || 0) ** 2 + (d.z || 0) ** 2);
-      const now = Date.now();
-      // push timestamp if magnitude exceeds threshold
-      if (mag > threshold) {
-        bufferRef.current.push(now);
-      }
-      // drop old samples
-      const windowStart = now - windowMs;
-      bufferRef.current = bufferRef.current.filter((t) => t >= windowStart);
-
-      if (bufferRef.current.length >= requiredCount && now - lastTriggerRef.current > 5000) {
-        lastTriggerRef.current = now;
-        try {
-          onShake();
-        } catch (err) {
-          // swallow
-        }
-        bufferRef.current = [];
+    void startShakeDetection();
+    const sub = addShakeTriggerListener(() => {
+      try {
+        onShake();
+      } catch (err) {
+        console.warn("[useShakeDetector] onShake callback error:", err);
       }
     });
 
     return () => {
-      mounted = false;
       sub.remove();
+      void stopShakeDetection();
     };
-  }, [onShake, threshold, windowMs, requiredCount]);
+  }, [onShake]);
 }
