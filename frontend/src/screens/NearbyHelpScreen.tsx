@@ -26,9 +26,9 @@ const FILTERS = [
 ];
 
 const HELP_PLACES = [
-  { id: "1", name: "Indiranagar Police Station", kind: "police", detail: "100 Ft Road · 24/7 Desk", distance: "400 m", open: true },
-  { id: "2", name: "Manipal Hospital Emergency", kind: "hospital", detail: "HAL Old Airport Rd · Trauma Unit", distance: "1.2 km", open: true },
-  { id: "3", name: "St. John Women Safety Cell", kind: "ngo", detail: "Koramangala · Support & Shelter", distance: "2.4 km", open: true },
+  { id: "1", name: "Indiranagar Police Station", kind: "police", detail: "100 Ft Road • 24/7 Desk", distance: "400 m", open: true },
+  { id: "2", name: "Manipal Hospital Emergency", kind: "hospital", detail: "HAL Old Airport Rd • Trauma Unit", distance: "1.2 km", open: true },
+  { id: "3", name: "St. John Women Safety Cell", kind: "ngo", detail: "Koramangala • Support & Shelter", distance: "2.4 km", open: true },
 ];
 
 const EMERGENCY_NUMBERS = [
@@ -91,7 +91,7 @@ export function NearbyHelpScreen({
               </View>
               <View style={styles.placeTextWrap}>
                 <Text style={styles.placeTitle}>{places[0].name}</Text>
-                <Text style={styles.placeDetail}>{places[0].distance} · {places[0].open ? "Open now" : "Closed"}</Text>
+                <Text style={styles.placeDetail}>{places[0].distance} • {places[0].open ? "Open now" : "Closed"}</Text>
               </View>
               <View style={styles.mapNavCircle}>
                 <Navigation size={18} color={colors.primaryForeground} />

@@ -110,7 +110,7 @@ export function ProfileScreen({
   const medicalSubParts: string[] = [];
   if (profile?.blood_group) medicalSubParts.push(`Blood group ${profile.blood_group}`);
   if (profile?.medical_notes) medicalSubParts.push(profile.medical_notes);
-  const medicalSub = medicalSubParts.length > 0 ? medicalSubParts.join(" · ") : "No medical info added";
+  const medicalSub = medicalSubParts.length > 0 ? medicalSubParts.join(" • ") : "No medical info added";
 
   const openMedicalEditor = () => {
     const parsed = parseMedicalNotes(profile?.medical_notes);
@@ -144,7 +144,7 @@ export function ProfileScreen({
     }
   };
 
-  const deviceSub = `${Platform.OS === "ios" ? "iOS Device" : "Android Device"} · registered`;
+  const deviceSub = `${Platform.OS === "ios" ? "iOS Device" : "Android Device"} • registered`;
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -178,7 +178,7 @@ export function ProfileScreen({
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <ProfileCard initials={initials} name={name} meta={`${phone} · Verified`} />
+        <ProfileCard initials={initials} name={name} meta={`${phone} • Verified`} />
 
         <View style={styles.statsGrid}>
           {[

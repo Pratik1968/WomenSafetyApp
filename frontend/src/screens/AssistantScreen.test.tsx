@@ -6,20 +6,21 @@ afterEach(() => {
 });
 
 describe("AssistantScreen", () => {
-  it("renders assistant header and conversation messages", async () => {
+  it("renders assistant header", async () => {
     await render(<AssistantScreen />);
     expect(screen.getByText("Ask Aegis")).toBeTruthy();
-    expect(screen.getByText("Hi Aisha, I'm Aegis. I monitor safety data and keep an eye on your surroundings. How can I help right now?")).toBeTruthy();
   });
 
-  it("renders empty state when state prop is empty", async () => {
-    await render(<AssistantScreen state="empty" />);
-    expect(screen.getByText("No conversations yet")).toBeTruthy();
-  });
-
-  it("renders quick prompt suggestion chips", async () => {
+  it("renders welcome state with greeting when no messages", async () => {
     await render(<AssistantScreen />);
-    expect(screen.getByText("Safe way home?")).toBeTruthy();
-    expect(screen.getByText("Check nearby police")).toBeTruthy();
+    expect(screen.getByText("How can I help you?")).toBeTruthy();
+  });
+
+  it("renders suggestion chips on welcome screen", async () => {
+    await render(<AssistantScreen />);
+    expect(screen.getByText("Safe Route")).toBeTruthy();
+    expect(screen.getByText("Nearby Police")).toBeTruthy();
+    expect(screen.getByText("Emergency Help")).toBeTruthy();
   });
 });
+

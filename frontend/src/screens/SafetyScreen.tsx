@@ -189,7 +189,7 @@ export function SafetyScreen({
               <ListItem
                 key={c.id}
                 onPress={onContacts}
-                icon={<Text style={styles.contactInitials}>{c.initials}</Text>}
+                icon={<Text style={styles.contactInitials}>{c.initials || c.name.substring(0, 2).toUpperCase()}</Text>}
                 title={c.name}
                 subtitle={`${formatRelationLabel(c.relation)} · ${c.phone}`}
               />
@@ -313,3 +313,4 @@ const styles = StyleSheet.create({
   tipBody: { fontSize: 13, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 },
   tipMinutes: { fontSize: 11, color: `${colors.mutedForeground}90`, marginTop: 6 },
 });
+

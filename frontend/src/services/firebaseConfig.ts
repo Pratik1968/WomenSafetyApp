@@ -20,9 +20,22 @@ export async function clearPasswordSessionToken(): Promise<void> {
   await setPasswordSessionToken(null);
 }
 
-async function getPasswordSessionToken(): Promise<string | null> {
+export async function getPasswordSessionToken(): Promise<string | null> {
   if (activePasswordSessionToken) return activePasswordSessionToken;
   activePasswordSessionToken = await AsyncStorage.getItem(PASSWORD_SESSION_TOKEN_KEY);
+  return activePasswordSessionToken;
+}
+
+/**
+ * Synchronous read of the in-memory app-password session token, for callers that need to
+ * check "is a password session active right now" without awaiting an AsyncStorage lookup
+ * (e.g. FirebaseAuthInfrastructureService's synchronous isAuthenticated()/getCurrentUser()).
+ * Reflects only what has already been loaded into memory this process — via
+ * setPasswordSessionToken() or a prior getPasswordSessionToken() call — so on a cold app
+ * start it will not see a session persisted in a previous run until getPasswordSessionToken()
+ * has been awaited at least once (e.g. via getAuthHeader()).
+ */
+export function getActivePasswordSessionToken(): string | null {
   return activePasswordSessionToken;
 }
 
@@ -51,4 +64,5 @@ export async function getAuthHeader(forceRefresh = false): Promise<Record<string
   const passwordSessionToken = await getPasswordSessionToken();
   return passwordSessionToken ? { Authorization: `Bearer ${passwordSessionToken}` } : {};
 }
+
 

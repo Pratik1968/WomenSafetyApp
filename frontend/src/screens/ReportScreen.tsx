@@ -8,22 +8,28 @@ import { AppButton } from "../components/ds/AppButton";
 import { Card } from "../components/ds/Card";
 import { Chip } from "../components/ds/Chip";
 import { NavBar } from "../components/ds/NavBar";
-import { Screen } from "../components/ds/Screen";
 import { SuccessCheck } from "../components/ds/SuccessCheck";
 import { Aurora } from "../components/ds/Aurora";
-import { REPORT_TYPE_META } from "../components/app/reportMeta";
-import { submitIncidentReport, type ReportMediaFile, type ReportType } from "../data/reports";
+import { submitIncidentReport, type ReportType } from "../services/reportService";
 
-const CATEGORIES = Object.keys(REPORT_TYPE_META) as ReportType[];
+const REPORT_CATEGORIES: { id: ReportType; label: string }[] = [
+  { id: "HARASSMENT", label: "Harassment" },
+  { id: "THEFT", label: "Theft" },
+  { id: "ASSAULT", label: "Assault" },
+  { id: "STALKING", label: "Stalking" },
+  { id: "SUSPICIOUS_PERSON", label: "Suspicious person" },
+  { id: "UNSAFE_LOCATION", label: "Unsafe location" },
+];
+
 const MAX_ATTACHMENTS = 5;
 
-type Attachment = ReportMediaFile & { kind: "photo" | "video" };
+type Attachment = { uri: string; type: string; name: string; kind: "PHOTO" | "VIDEO" };
 
 function assetToAttachment(asset: ImagePicker.ImagePickerAsset): Attachment {
   const isVideo = asset.type === "video";
-  const mimeType = asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
+  const type = asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
   const name = asset.fileName || `${isVideo ? "video" : "photo"}-${Date.now()}.${isVideo ? "mp4" : "jpg"}`;
-  return { uri: asset.uri, name, mimeType, kind: isVideo ? "video" : "photo" };
+  return { uri: asset.uri, type, name, kind: isVideo ? "VIDEO" : "PHOTO" };
 }
 
 export function ReportScreen({
@@ -38,7 +44,7 @@ export function ReportScreen({
   const [picked, setPicked] = useState<ReportType | null>(null);
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,20 +62,17 @@ export function ReportScreen({
       }
       const position = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = position.coords;
-      setCoords({ lat: latitude, lng: longitude });
+      setCoords({ latitude, longitude });
 
       try {
-        const results = await Location.reverseGeocodeAsync({
-          latitude,
-          longitude,
-        });
+        const results = await Location.reverseGeocodeAsync({ latitude, longitude });
         const place = results?.[0];
         if (place) {
           const line = [place.street, place.city || place.subregion].filter(Boolean).join(", ");
           setAddress(line || null);
         }
       } catch {
-        // Reverse geocoding is best-effort — coordinates alone are still enough to submit.
+        // Reverse geocoding is best-effort - coordinates alone are still enough to submit.
       }
     } catch {
       setError("Couldn't get your current location. Check location services and try again.");
@@ -85,20 +88,24 @@ export function ReportScreen({
 
   if (submitted) {
     return (
-      <Screen style={styles.successScreen}>
+      <View style={styles.successScreen}>
         <Aurora />
         <View style={styles.successContent}>
           <SuccessCheck size={96} />
           <Text style={styles.successTitle}>Thank you for speaking up</Text>
-          <Text style={styles.successSub}>This report helps others plan safer routes. Your name is never attached to a report.</Text>
+          <Text style={styles.successSub}>
+            This report helps others plan safer routes. Your name is never attached to a report.
+          </Text>
         </View>
         <View style={styles.successFooter}>
           <AppButton onPress={onSubmitDone}>Done</AppButton>
-          <Pressable onPress={onViewCommunity} style={styles.successLink}>
-            <Text style={styles.successLinkText}>View community reports</Text>
-          </Pressable>
+          {onViewCommunity && (
+            <Pressable onPress={onViewCommunity} style={styles.successLink}>
+              <Text style={styles.successLinkText}>View community reports</Text>
+            </Pressable>
+          )}
         </View>
-      </Screen>
+      </View>
     );
   }
 
@@ -109,10 +116,7 @@ export function ReportScreen({
       setError("Camera permission is needed to attach a photo.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.7,
-    });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7 });
     if (!result.canceled && result.assets?.[0]) {
       setAttachments((prev) => [...prev, assetToAttachment(result.assets[0])]);
     }
@@ -147,117 +151,118 @@ export function ReportScreen({
     try {
       await submitIncidentReport({
         reportType: picked,
-        lat: coords.lat,
-        lng: coords.lng,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         description: description.trim() || undefined,
         address: address || undefined,
-        files: attachments,
+        mediaFiles: attachments,
       });
       setSubmitted(true);
-    } catch (e) {
-      setError((e as Error)?.message ?? "Couldn't submit your report. Check your connection and try again.");
+    } catch (err: any) {
+      console.warn("Failed to submit incident report:", err);
+      setError(err?.message || "Couldn't submit your report. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Screen>
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <NavBar title="Report unsafe area" onBack={onBack} />
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <NavBar title="Report unsafe area" onBack={onBack} />
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.mainTitle}>What felt unsafe here?</Text>
-          <Text style={styles.mainSub}>Pick the category that best fits. Reports are anonymous and help others plan safer routes.</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.mainTitle}>What felt unsafe here?</Text>
+        <Text style={styles.mainSub}>
+          Pick the category that best fits. Reports are anonymous and help others plan safer routes.
+        </Text>
 
-          <View style={styles.categoriesWrap}>
-            {CATEGORIES.map((c) => (
-              <Chip key={c} active={picked === c} onPress={() => setPicked(c)}>
-                {REPORT_TYPE_META[c].label}
-              </Chip>
-            ))}
-          </View>
+        <View style={styles.categoriesWrap}>
+          {REPORT_CATEGORIES.map((c) => (
+            <Chip key={c.id} active={picked === c.id} onPress={() => setPicked(c.id)}>
+              {c.label}
+            </Chip>
+          ))}
+        </View>
 
-          <Text style={styles.sectionHeading}>DESCRIPTION</Text>
-          <View style={styles.textInputWrap}>
-            <TextInput
-              style={styles.textArea}
-              multiline
-              numberOfLines={4}
-              placeholder="Optional. A sentence is enough — what happened, and around what time."
-              placeholderTextColor={colors.mutedForeground}
-              value={description}
-              onChangeText={setDescription}
-            />
-          </View>
+        <Text style={styles.sectionHeading}>DESCRIPTION</Text>
+        <View style={styles.textInputWrap}>
+          <TextInput
+            style={styles.textArea}
+            multiline
+            numberOfLines={4}
+            placeholder="Optional. A sentence is enough — what happened, and around what time."
+            placeholderTextColor={colors.mutedForeground}
+            value={description}
+            onChangeText={setDescription}
+          />
+        </View>
 
-          <Text style={styles.sectionHeading}>PHOTOS &amp; VIDEO (OPTIONAL)</Text>
-          <View style={styles.photosGrid}>
-            {attachments.map((a) => (
-              <View key={a.uri} style={styles.thumbWrap}>
-                {a.kind === "photo" ? (
-                  <Image source={{ uri: a.uri }} style={styles.thumbImage} />
-                ) : (
-                  <View style={[styles.thumbImage, styles.videoThumb]}>
-                    <Video size={22} color={colors.mutedForeground} />
-                  </View>
-                )}
-                <Pressable style={styles.thumbRemove} onPress={() => removeAttachment(a.uri)}>
-                  <X size={12} color="#fff" />
-                </Pressable>
-              </View>
-            ))}
-            {attachments.length < MAX_ATTACHMENTS && (
-              <>
-                <Pressable style={styles.photoUploadBtn} onPress={addPhoto} testID="report-add-photo">
-                  <Camera size={22} color={colors.mutedForeground} />
-                </Pressable>
-                <Pressable style={styles.photoUploadBtn} onPress={addFromLibrary} testID="report-add-library">
-                  <ImagePlus size={22} color={colors.mutedForeground} />
-                </Pressable>
-              </>
-            )}
-          </View>
-
-          <Text style={styles.sectionHeading}>LOCATION</Text>
-          <Card style={styles.locationCard}>
-            <View style={styles.locationMapStub}>
-              <MapPin size={22} color={colors.warning} />
-              <Text style={styles.locationMapStubText}>
-                {locating ? "Locating…" : address || (coords ? "Current location" : "Location unavailable")}
-              </Text>
-            </View>
-            <View style={styles.locationInfoRow}>
-              <MapPin size={18} color={colors.primary} />
-              <View style={styles.locationTextWrap}>
-                <Text style={styles.locationName}>{address || "Current location"}</Text>
-                <Text style={styles.locationSub}>
-                  {coords ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : "Waiting for GPS fix"}
-                </Text>
-              </View>
-              <Pressable onPress={refreshLocation}>
-                <Text style={styles.locationChangeBtn}>{locating ? "…" : "Refresh"}</Text>
+        <Text style={styles.sectionHeading}>PHOTOS &amp; VIDEO (OPTIONAL)</Text>
+        <View style={styles.photosGrid}>
+          {attachments.map((a) => (
+            <View key={a.uri} style={styles.thumbWrap}>
+              {a.kind === "PHOTO" ? (
+                <Image source={{ uri: a.uri }} style={styles.thumbImage} />
+              ) : (
+                <View style={[styles.thumbImage, styles.videoThumb]}>
+                  <Video size={22} color={colors.mutedForeground} />
+                </View>
+              )}
+              <Pressable style={styles.thumbRemove} onPress={() => removeAttachment(a.uri)}>
+                <X size={12} color="#fff" />
               </Pressable>
             </View>
-          </Card>
+          ))}
+          {attachments.length < MAX_ATTACHMENTS && (
+            <>
+              <Pressable style={styles.photoUploadBtn} onPress={addPhoto} testID="report-add-photo">
+                <Camera size={22} color={colors.mutedForeground} />
+              </Pressable>
+              <Pressable style={styles.photoUploadBtn} onPress={addFromLibrary} testID="report-add-library">
+                <ImagePlus size={22} color={colors.mutedForeground} />
+              </Pressable>
+            </>
+          )}
+        </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <View style={styles.privacyNote}>
-            <ShieldCheck size={16} color={colors.mutedForeground} />
-            <Text style={styles.privacyNoteText}>
-              Your identity is never shared. Only the area, category and time are made visible to others.
+        <Text style={styles.sectionHeading}>LOCATION</Text>
+        <Card style={styles.locationCard}>
+          <View style={styles.locationMapStub}>
+            <MapPin size={22} color={colors.warning} />
+            <Text style={styles.locationMapStubText}>
+              {locating ? "Locating…" : address || (coords ? "Current location" : "Location unavailable")}
             </Text>
           </View>
-        </ScrollView>
+          <View style={styles.locationInfoRow}>
+            <MapPin size={18} color={colors.primary} />
+            <View style={styles.locationTextWrap}>
+              <Text style={styles.locationName}>{address || "Current location"}</Text>
+              <Text style={styles.locationSub}>
+                {coords ? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}` : "Waiting for GPS fix"}
+              </Text>
+            </View>
+            <Pressable onPress={refreshLocation}>
+              <Text style={styles.locationChangeBtn}>{locating ? "…" : "Refresh"}</Text>
+            </Pressable>
+          </View>
+        </Card>
 
-        <View style={styles.footer}>
-          <AppButton loading={submitting} disabled={!canSubmit} onPress={handleSubmit}>
-            Submit report
-          </AppButton>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <View style={styles.privacyNote}>
+          <ShieldCheck size={16} color={colors.mutedForeground} />
+          <Text style={styles.privacyNoteText}>
+            Your identity is never shared. Only the area, category and time are made visible to others.
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </Screen>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <AppButton loading={submitting} disabled={!canSubmit} onPress={handleSubmit}>
+          Submit report
+        </AppButton>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -265,32 +270,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  mainTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.foreground,
-    letterSpacing: -0.2,
-  },
-  mainSub: {
-    fontSize: 15,
-    color: colors.mutedForeground,
-    marginTop: 6,
-    lineHeight: 22,
-  },
-  categoriesWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 16,
-  },
-  sectionHeading: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.mutedForeground,
-    letterSpacing: 0.5,
-    marginTop: 24,
-    marginBottom: 10,
-  },
+  mainTitle: { fontSize: 24, fontWeight: "700", color: colors.foreground, letterSpacing: -0.2 },
+  mainSub: { fontSize: 15, color: colors.mutedForeground, marginTop: 6, lineHeight: 22 },
+  categoriesWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
+  sectionHeading: { fontSize: 13, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5, marginTop: 24, marginBottom: 10 },
   textInputWrap: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -299,11 +282,7 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 110,
   },
-  textArea: {
-    fontSize: 15,
-    color: colors.foreground,
-    textAlignVertical: "top",
-  },
+  textArea: { fontSize: 15, color: colors.foreground, textAlignVertical: "top" },
   photosGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   photoUploadBtn: {
     width: 80,
@@ -318,11 +297,7 @@ const styles = StyleSheet.create({
   },
   thumbWrap: { width: 80, height: 80 },
   thumbImage: { width: 80, height: 80, borderRadius: radii.xl },
-  videoThumb: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-  },
+  videoThumb: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surface },
   thumbRemove: {
     position: "absolute",
     top: -6,
@@ -344,61 +319,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  locationMapStubText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.foreground,
-  },
-  locationInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-  },
+  locationMapStubText: { fontSize: 14, fontWeight: "600", color: colors.foreground },
+  locationInfoRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
   locationTextWrap: { flex: 1 },
   locationName: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   locationSub: { fontSize: 12, color: colors.mutedForeground },
   locationChangeBtn: { fontSize: 14, fontWeight: "600", color: colors.primary },
   errorText: { fontSize: 13, color: colors.destructive, marginTop: 16 },
-  privacyNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginTop: 16,
-  },
-  privacyNoteText: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.mutedForeground,
-    lineHeight: 18,
-  },
+  privacyNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 16 },
+  privacyNoteText: { flex: 1, fontSize: 12, color: colors.mutedForeground, lineHeight: 18 },
   footer: { paddingHorizontal: 20, paddingBottom: 20 },
-  successScreen: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: "space-between",
-  },
-  successContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
-  },
-  successTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: colors.foreground,
-    marginTop: 24,
-    textAlign: "center",
-  },
-  successSub: {
-    fontSize: 15,
-    color: colors.mutedForeground,
-    textAlign: "center",
-    marginTop: 12,
-    lineHeight: 22,
-  },
+  successScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
+  successContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, textAlign: "center" },
+  successTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 24, textAlign: "center" },
+  successSub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 12, lineHeight: 22 },
   successFooter: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
   successLink: { alignItems: "center", paddingVertical: 4 },
   successLinkText: { fontSize: 14, fontWeight: "600", color: colors.primary },
 });
+
