@@ -199,6 +199,13 @@ export function HistoryScreen({
   );
 }
 
+import {
+  EVENT_DISPLAY_CONFIG,
+  IncidentEventRecord,
+  IncidentEventType,
+} from "../data/incidentEvents";
+import { fetchIncidentTimeline } from "../data/timelineService";
+
 const STEP_LABELS: Record<string, { title: string; tone: TimelineTone }> = {
   SOS_TRIGGERED: { title: "SOS triggered", tone: "emergency" },
   LOCATION_ACQUIRED: { title: "Location acquired", tone: "brand" },
@@ -209,9 +216,27 @@ const STEP_LABELS: Record<string, { title: string; tone: TimelineTone }> = {
   LIVE_TRACKING_FAILED: { title: "Live location tracking failed", tone: "warning" },
   LOCATION_UPDATE: { title: "Location updated", tone: "brand" },
   SOS_ENDED: { title: "Emergency ended", tone: "success" },
+  AI_WARNING: { title: "AI Pre-Warning Triggered", tone: "warning" },
+  AI_RISK_DETECTED: { title: "AI Threat Detected", tone: "warning" },
 };
 
-function describeTimelineStep(entry: SOSLogEntry): { time: string; title: string; detail?: string; tone: TimelineTone } {
+function describeTimelineStep(entry: SOSLogEntry | IncidentEventRecord): { time: string; title: string; detail?: string; tone: TimelineTone } {
+  if ("event_type" in entry) {
+    const cfg = EVENT_DISPLAY_CONFIG[entry.event_type as IncidentEventType] ?? {
+      title: entry.title || entry.event_type,
+      tone: "brand" as const,
+    };
+    const timeStr = entry.created_at
+      ? formatTime(new Date(entry.created_at).getTime())
+      : "";
+    return {
+      time: timeStr,
+      title: entry.title || cfg.title,
+      detail: entry.description ?? (entry.metadata ? JSON.stringify(entry.metadata) : undefined),
+      tone: cfg.tone as TimelineTone,
+    };
+  }
+
   const label = STEP_LABELS[entry.step] ?? { title: entry.step, tone: "brand" as const };
   let detail: string | undefined;
   if (entry.step === "SMS_SENT" && Array.isArray(entry.data?.numbers)) {
@@ -224,6 +249,11 @@ function describeTimelineStep(entry: SOSLogEntry): { time: string; title: string
     }
   } else if (entry.step === "SOS_ENDED" && typeof entry.data?.status === "string") {
     detail = `Marked as ${entry.data.status}.`;
+  } else if (
+    (entry.step === "AI_WARNING" || entry.step === "AI_RISK_DETECTED") &&
+    typeof entry.data?.detail === "string"
+  ) {
+    detail = entry.data.detail;
   }
   return { time: formatTime(entry.timestamp), title: label.title, detail, tone: label.tone };
 }
@@ -238,6 +268,7 @@ export function IncidentDetailScreen({
   onBack?: () => void;
 }) {
   const [incident, setIncident] = useState<SOSIncident | null | undefined>(undefined);
+  const [timelineEvents, setTimelineEvents] = useState<IncidentEventRecord[]>([]);
 
   useEffect(() => {
     if (!incidentId) {
@@ -247,6 +278,10 @@ export function IncidentDetailScreen({
     getIncidentById(incidentId)
       .then((found) => setIncident(found ?? null))
       .catch(() => setIncident(null));
+
+    fetchIncidentTimeline(incidentId)
+      .then(setTimelineEvents)
+      .catch(() => setTimelineEvents([]));
   }, [incidentId]);
 
   if (incident === undefined) {
@@ -273,6 +308,11 @@ export function IncidentDetailScreen({
   const locText = incident.location
     ? `${incident.location.lat.toFixed(4)}, ${incident.location.lon.toFixed(4)}`
     : "Location unavailable";
+
+  const displayTimeline =
+    incident.timeline && incident.timeline.length > 0
+      ? incident.timeline
+      : timelineEvents;
 
   return (
     <View style={styles.screen}>
@@ -304,22 +344,23 @@ export function IncidentDetailScreen({
 
         <Text style={styles.sectionHeading}>TIMELINE</Text>
         <Card style={styles.sectionCard}>
-          {incident.timeline.map((entry, i) => {
+          {displayTimeline.map((entry, i) => {
             const step = describeTimelineStep(entry);
+            const keyStr = "step" in entry ? `${entry.step}-${entry.timestamp}-${i}` : `${entry.id}-${entry.created_at}-${i}`;
             return (
               <TimelineItem
-                key={`${entry.step}-${entry.timestamp}-${i}`}
+                key={keyStr}
                 time={step.time}
                 title={step.title}
                 detail={step.detail}
                 tone={step.tone}
-                last={i === incident.timeline.length - 1}
+                last={i === displayTimeline.length - 1}
               />
             );
           })}
         </Card>
 
-        {incident.contactsNotified.length > 0 && (
+        {incident.contactsNotified && incident.contactsNotified.length > 0 && (
           <>
             <Text style={styles.sectionHeading}>CONTACTS NOTIFIED</Text>
             <Card style={styles.sectionCard}>

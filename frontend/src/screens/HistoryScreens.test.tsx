@@ -47,5 +47,29 @@ describe("HistoryScreens", () => {
     await render(<IncidentDetailScreen incidentId="does-not-exist" />);
     expect(await screen.findByText("Incident not found")).toBeTruthy();
   });
+
+  it("renders a friendly label for an AI behavior-analysis alert in the timeline", async () => {
+    const { triggerSOS } = require("../services/sosOrchestratorService");
+    const incidentId = await triggerSOS("BUTTON");
+
+    // Manually append the step the way the real pipeline would once
+    // behaviorAnalysisService.evaluate resolves with a decision (that resolution
+    // is async and fire-and-forget in the real pipeline; append directly here to
+    // keep this test deterministic rather than racing the fire-and-forget timer).
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    const raw = await AsyncStorage.getItem("@aegis_incidents_v2");
+    const incidents = JSON.parse(raw);
+    const idx = incidents.findIndex((i: { id: string }) => i.id === incidentId);
+    incidents[idx].timeline.push({
+      step: "AI_RISK_DETECTED",
+      timestamp: Date.now(),
+      data: { detail: "No significant movement for an extended period." },
+    });
+    await AsyncStorage.setItem("@aegis_incidents_v2", JSON.stringify(incidents));
+
+    await render(<IncidentDetailScreen incidentId={incidentId} />);
+
+    expect(await screen.findByText("AI Threat Detected")).toBeTruthy();
+  });
 });
 
