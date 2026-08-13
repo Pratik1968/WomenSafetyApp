@@ -1,24 +1,51 @@
 {
   "expo": {
-    "name": "WomenSafty",
-    "slug": "womensafty",
+    "name": "Aegis",
+    "slug": "aegis-women-safety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.womensafty.app"
+      "bundleIdentifier": "com.nameisrk.aegiswomensafety",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+        "NSMicrophoneUsageDescription": "Allow Aegis to access the microphone for emergency voice recognition and audio evidence.",
+        "NSLocationWhenInUseUsageDescription": "Allow Aegis to access your location to broadcast SOS coordinates.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+        "NSContactsUsageDescription": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
+      }
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "foregroundImage": "./assets/splash-icon.png",
         "backgroundColor": "#090A0F"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.womensafty.app"
+      "package": "com.nameisrk.aegiswomensafety",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.CALL_PHONE",
+        "android.permission.SEND_SMS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +57,43 @@
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain",
           "backgroundColor": "#090A0F"
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/splash-icon.png",
+          "color": "#ef4444"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+          "microphonePermission": "Allow Aegis to access the microphone to record audio evidence during an active SOS emergency.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
       ]
     ]
