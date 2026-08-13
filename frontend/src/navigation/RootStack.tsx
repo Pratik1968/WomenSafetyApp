@@ -1,9 +1,8 @@
 import { FakeCallScreen } from "../screens/FakeCallScreen";
 import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Alert, Platform, Linking } from "react-native";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
-import * as Linking from "expo-linking";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
@@ -30,6 +29,7 @@ import { HistoryScreen, IncidentDetailScreen } from "../screens/HistoryScreens";
 import { ProfileScreen, SettingsScreen, DataPrivacyScreen, ManageContactsScreen } from "../screens/ProfileScreens";
 import { SosScreen, type SosState } from "../screens/SosScreen";
 import { SafeRouteScreen } from "../screens/SafeRouteScreen";
+import { FamilyLiveTrackingScreen } from "../screens/FamilyLiveTrackingScreen";
 import { NearbyHelpScreen } from "../screens/NearbyHelpScreen";
 import { AssistantScreen } from "../screens/AssistantScreen";
 import { ReportScreen } from "../screens/ReportScreen";
@@ -53,7 +53,7 @@ import { contactStorageService } from "../services/contactStorageService";
 import { API_BASE_URL } from "../api/config";
 import { getAuthHeader, setPhoneConfirmation, getPhoneConfirmation } from "../services/firebaseConfig";
 import { addEmergencyActionListener } from "../modules/EmergencyModule";
-import { FaceVerificationScreen,FaceRegistrationScreen,} from "../modules/face";
+import { FaceVerificationScreen, FaceRegistrationScreen } from "../modules/face";
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -90,23 +90,15 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminIncidents: undefined;
-  FaceVerification: undefined;
-  FaceRegistration: undefined;
   VoiceTriggerConfig: undefined;
   VoiceTraining: undefined;
+  FamilyLiveTracking: { sessionId?: string } | undefined;
+  FaceVerification: undefined;
+  FaceRegistration: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 type P<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
-
-function FakeCallRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "FakeCall">) {
-  return <FakeCallScreen onBack={() => navigation.goBack()} />;
-}
-
-function IncomingCallRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "IncomingCall">) {
-  return <IncomingCallScreen />;
-}
-
 function SplashRouteScreen({ navigation }: P<"Splash">) {
   useEffect(() => {
     const t = setTimeout(() => navigation.replace("Onboarding"), 2600);
@@ -333,9 +325,7 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
         else if (action === "Register Face") navigation.navigate("FaceRegistration");
-
         else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
-        else if (action === "Fake Call") navigation.navigate("IncomingCall");
       }}
       onQuickActionLongPress={(action: string) => {
         if (action === "Fake Call") navigation.navigate("FakeCall");
@@ -435,9 +425,17 @@ function SosRouteScreen({ navigation, route }: P<"Sos">) {
   );
 }
 
-function FaceVerificationRouteScreen({
-  navigation,
-}: P<"FaceVerification">) {
+function ReportRouteScreen({ navigation }: P<"Report">) {
+  return (
+    <ReportScreen
+      onBack={() => navigation.goBack()}
+      onSubmitDone={() => navigation.replace("Home")}
+      onViewCommunity={() => navigation.replace("CommunityReports")}
+    />
+  );
+}
+
+function FaceVerificationRouteScreen({ navigation }: P<"FaceVerification">) {
   return (
     <FaceVerificationScreen
       onVerified={() => navigation.replace("Home")}
@@ -446,22 +444,10 @@ function FaceVerificationRouteScreen({
   );
 }
 
-function FaceRegistrationRouteScreen({
-  navigation,
-}: P<"FaceRegistration">) {
+function FaceRegistrationRouteScreen({ navigation }: P<"FaceRegistration">) {
   return (
     <FaceRegistrationScreen
       onDone={() => navigation.goBack()}
-    />
-  );
-}
-
-function ReportRouteScreen({ navigation }: P<"Report">) {
-  return (
-    <ReportScreen
-      onBack={() => navigation.goBack()}
-      onSubmitDone={() => navigation.replace("Home")}
-      onViewCommunity={() => navigation.replace("CommunityReports")}
     />
   );
 }
@@ -480,6 +466,24 @@ function UploadEvidenceRouteScreen({ navigation, route }: P<"UploadEvidence">) {
 
 function EvidenceDetailRouteScreen({ navigation, route }: P<"EvidenceDetail">) {
   return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
+}
+
+function FakeCallRouteScreen({ navigation }: P<"FakeCall">) {
+  return <FakeCallScreen onBack={() => navigation.goBack()} />;
+}
+
+function IncomingCallRouteScreen({ navigation }: P<"IncomingCall">) {
+  return <IncomingCallScreen />;
+}
+
+function FamilyLiveTrackingRouteScreen({ navigation, route }: P<"FamilyLiveTracking">) {
+  return (
+    <FamilyLiveTrackingScreen
+      sessionId={route.params?.sessionId}
+      onBack={() => navigation.goBack()}
+      onEmergencyAlert={() => navigation.navigate("Sos", { state: "active" })}
+    />
+  );
 }
 
 function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
@@ -559,7 +563,7 @@ function MobileApp() {
   }, [navigationRef]);
 
   const linking = {
-    prefixes: [Linking.createURL("/"), "aegis://", "aegiswomensafety://"],
+    prefixes: ["aegis://", "aegiswomensafety://"],
     config: {
       screens: {
         IncomingCall: "fakecall",
@@ -584,9 +588,17 @@ function MobileApp() {
         <Stack.Screen name="History" component={HistoryRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Profile" component={ProfileRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Sos" component={SosRouteScreen} />
+        <Stack.Screen name="SafeRoute">
+          {({ navigation }: P<"SafeRoute">) => (
+            <SafeRouteScreen
+              onBack={() => navigation.goBack()}
+              onOpenFamilyTracking={() => navigation.navigate("FamilyLiveTracking")}
+            />
+          )}
+        </Stack.Screen>
+        <Stack.Screen name="FamilyLiveTracking" component={FamilyLiveTrackingRouteScreen} />
         <Stack.Screen name="FaceVerification" component={FaceVerificationRouteScreen} />
         <Stack.Screen name="FaceRegistration" component={FaceRegistrationRouteScreen} />
-        <Stack.Screen name="SafeRoute" component={SafeRouteScreen} />
         <Stack.Screen name="NearbyHelp" component={NearbyHelpScreen} />
         <Stack.Screen name="Assistant" component={AssistantScreen} />
         <Stack.Screen name="Report" component={ReportRouteScreen} />

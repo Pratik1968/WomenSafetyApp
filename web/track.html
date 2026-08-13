@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Aegis Live Safety Tracking Web App — OpenStreetMap</title>
+  
+  <!-- OpenStreetMap Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase Compat JS SDKs for Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; min-height: 100vh; }
+    header { background: #1e293b; border-bottom: 1px solid #334155; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-size: 18px; font-weight: 800; color: #ef4444; display: flex; align-items: center; gap: 8px; }
+    .badge { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+    .container { flex: 1; display: flex; flex-direction: column; max-width: 800px; width: 100%; margin: 0 auto; padding: 16px; gap: 16px; }
+    
+    /* User Header Info Card */
+    .user-info-bar { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .user-name { font-size: 17px; font-weight: 800; color: #ffffff; }
+    .updated-at { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+    /* OpenStreetMap Container */
+    #map { height: 340px; width: 100%; border-radius: 16px; border: 1px solid #334155; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+    
+    /* Live Metrics Grid */
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 14px; text-align: center; }
+    .val { font-size: 20px; font-weight: 800; color: #ffffff; }
+    .lbl { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+    /* Share Link Box Widget */
+    .share-widget { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .share-title { font-size: 14px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 6px; }
+    .share-input-row { display: flex; gap: 8px; }
+    .share-input { flex: 1; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 10px 14px; color: #94a3b8; font-size: 13px; outline: none; }
+    .btn-share-icon { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .btn-copy-icon { background: #475569; color: white; border: none; padding: 10px 14px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+    /* Actions */
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 4px; }
+    .btn { width: 100%; padding: 14px; border-radius: 14px; font-weight: 700; font-size: 15px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .btn-safe { background: #10b981; color: white; }
+    .btn-emergency { background: #ef4444; color: white; }
+    .btn-start { background: #8b5cf6; color: white; }
+
+    /* Pulsing Pin */
+    .user-pulse-marker { width: 22px; height: 22px; background-color: #10b981; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 12px #10b981; animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0.7); } 70% { transform: scale(1.15); box-shadow: 0 0 0 14px rgba(16,185,129,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
+
+    .safe-banner { background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #10b981; padding: 16px; border-radius: 14px; text-align: center; font-weight: 700; display: none; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 700; display: none; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🛡️ Aegis Live Safety Tracking</div>
+    <div class="badge" id="syncStatus">LIVE AUTO-SYNC (4.5s)</div>
+  </header>
+
+  <div class="container">
+    <div class="user-info-bar">
+      <div>
+        <div class="user-name" id="userName">Tracking Live Location</div>
+        <div class="updated-at" id="updatedAt">Last updated: Just now</div>
+      </div>
+      <div class="badge" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; border-color: #3b82f6;">OpenStreetMap</div>
+    </div>
+
+    <!-- Leaflet OpenStreetMap Container -->
+    <div id="map"></div>
+
+    <!-- Live Metrics Grid -->
+    <div class="grid">
+      <div class="card"><div class="val" id="etaVal">-- min</div><div class="lbl">ETA</div></div>
+      <div class="card"><div class="val" id="distVal">-- km</div><div class="lbl">Distance Left</div></div>
+      <div class="card"><div class="val" id="batteryVal">--%</div><div class="lbl">Battery</div></div>
+    </div>
+
+    <!-- Shareable Tracking Link Widget -->
+    <div class="share-widget">
+      <div class="share-title">🔗 Shareable Live Tracking Link</div>
+      <div class="share-input-row">
+        <input type="text" id="shareUrlInput" class="share-input" readonly />
+        <button class="btn-share-icon" onclick="shareLinkDirectly()">📲 Share</button>
+        <button class="btn-copy-icon" onclick="copyTrackingUrl()">📋 Copy</button>
+      </div>
+    </div>
+
+    <div class="safe-banner" id="safeBanner">✅ Sharing Ended — User Confirmed Safe</div>
+
+    <div class="actions">
+      <button class="btn btn-start" id="startBtn" onclick="startWebGPSBroadcast()">📡 Start Web GPS Broadcast (4.5s)</button>
+      <button class="btn btn-safe" id="stopBtn" onclick="stopTracking()">I'm Safe — Stop Live Location</button>
+      <a class="btn btn-emergency" href="tel:112">🚨 Emergency SOS (Call 112)</a>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Tracking link copied to clipboard!</div>
+
+  <script>
+    // 1. Extract session ID from query params: ?session=xyz or ?sessionId=xyz
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session') || urlParams.get('sessionId') || window.location.pathname.split('/').pop() || 'trk_demo';
+
+    // Populate share link box
+    const fullShareUrl = 'https://streetpartner.web.app/?session=' + sessionId;
+    document.getElementById('shareUrlInput').value = fullShareUrl;
+
+    // 2. Initialize OpenStreetMap Leaflet Map
+    var map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var userIcon = L.divIcon({ className: 'user-pulse-marker', iconSize: [22, 22], iconAnchor: [11, 11] });
+    var userMarker = L.marker([12.9716, 77.5946], { icon: userIcon }).addTo(map);
+
+    // Immediate HTML5 Geolocation fix to center OpenStreetMap directly on current position
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          userMarker.setLatLng(coords);
+          map.setView(coords, 16);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 4000 }
+      );
+    }
+
+    // 3. Firebase Realtime Database integration (women-safety-3d446 project)
+    const firebaseConfig = {
+      projectId: "women-safety-3d446",
+      databaseURL: "https://women-safety-3d446-default-rtdb.firebaseio.com",
+      authDomain: "women-safety-3d446.firebaseapp.com",
+      storageBucket: "women-safety-3d446.appspot.com"
+    };
+
+    try {
+      if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+        firebase.initializeApp(firebaseConfig);
+        var dbRef = firebase.database().ref('tracking_sessions/' + sessionId);
+        dbRef.on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) updateUI(val);
+        });
+      }
+    } catch (e) {
+      console.log("Firebase listener note:", e);
+    }
+
+    // 4. Polling API Fallback (every 4.5s)
+    function fetchLiveFeed() {
+      fetch('/api/v1/gps/session/' + sessionId)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            updateUI({
+              lat: data.current_lat,
+              lng: data.current_lng,
+              userName: data.user_name,
+              eta_minutes: data.eta_minutes,
+              distance_remaining_km: data.distance_remaining_km,
+              battery_level: data.battery_level,
+              active: data.is_active,
+              updatedAt: new Date(data.last_updated_at).getTime()
+            });
+          }
+        }).catch(err => console.log(err));
+    }
+
+    function updateUI(data) {
+      if (!data) return;
+      if (data.lat && data.lng) {
+        userMarker.setLatLng([data.lat, data.lng]);
+        map.panTo([data.lat, data.lng]);
+      }
+      if (data.userName) document.getElementById('userName').innerText = 'Tracking ' + data.userName;
+      document.getElementById('etaVal').innerText = (data.eta_minutes || '--') + ' min';
+      document.getElementById('distVal').innerText = (data.distance_remaining_km || '--') + ' km';
+      document.getElementById('batteryVal').innerText = (data.battery_level || '--') + '%';
+      if (data.updatedAt) {
+        document.getElementById('updatedAt').innerText = 'Last updated: ' + new Date(data.updatedAt).toLocaleTimeString();
+      }
+
+      if (data.active === false || data.is_active === false) {
+        document.getElementById('safeBanner').style.display = 'block';
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('syncStatus').innerText = 'SHARING ENDED';
+      }
+    }
+
+    fetchLiveFeed();
+    setInterval(fetchLiveFeed, 4500);
+
+    // 5. Direct Web Share API (WhatsApp, SMS, Messages)
+    function shareLinkDirectly() {
+      if (navigator.share) {
+        navigator.share({
+          title: '🛡️ Aegis Live Safety Tracking',
+          text: 'Track my real-time location live on OpenStreetMap:',
+          url: fullShareUrl,
+        }).catch(() => {});
+      } else {
+        copyTrackingUrl();
+      }
+    }
+
+    function copyTrackingUrl() {
+      navigator.clipboard.writeText(fullShareUrl).then(() => {
+        showToast('Tracking link copied to clipboard!');
+      });
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    // 6. Web Browser GPS Live Broadcaster (4.5s throttle)
+    let webGpsWatchId = null;
+    let webGpsTimer = null;
+    let lastWebCoords = null;
+
+    function startWebGPSBroadcast() {
+      if ('geolocation' in navigator) {
+        webGpsWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            lastWebCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          },
+          (err) => console.log('Geolocation error:', err),
+          { enableHighAccuracy: true }
+        );
+
+        webGpsTimer = setInterval(() => {
+          if (lastWebCoords) {
+            fetch('/api/v1/gps/ping', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                session_id: sessionId,
+                latitude: lastWebCoords.lat,
+                longitude: lastWebCoords.lng,
+                battery_level: 92,
+                is_active: true
+              })
+            }).catch(() => {});
+          }
+        }, 4500);
+
+        showToast('📡 Web GPS live broadcast started (4.5s sync)!');
+      } else {
+        alert('Geolocation is not supported by your browser.');
+      }
+    }
+
+    function stopTracking() {
+      if (webGpsWatchId) navigator.geolocation.clearWatch(webGpsWatchId);
+      if (webGpsTimer) clearInterval(webGpsTimer);
+
+      fetch('/api/v1/gps/session/' + sessionId + '/stop', { method: 'POST' })
+        .then(() => {
+          document.getElementById('safeBanner').style.display = 'block';
+          document.getElementById('stopBtn').style.display = 'none';
+          document.getElementById('syncStatus').innerText = 'SHARING ENDED';
+        });
+    }
+  </script>
+</body>
+</html>

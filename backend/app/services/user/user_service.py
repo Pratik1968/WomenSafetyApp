@@ -16,10 +16,6 @@ class UserService:
         if profile:
             return profile
 
-        # No row under this UID. Phone-auth UIDs aren't always stable across every
-        # sign-in path (e.g. an account created via password/admin flow verified its
-        # phone under a different UID) - fall back to the phone already on this
-        # verified token, same as the password-login and profile-save paths do.
         if not phone_number:
             return None
 

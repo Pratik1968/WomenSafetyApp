@@ -28,6 +28,12 @@ import {
 } from "../services/sosOrchestratorService";
 import { fetchIncidentHistory } from "../services/incidentSyncService";
 import { auth } from "../services/firebaseConfig";
+import {
+  EVENT_DISPLAY_CONFIG,
+  IncidentEventRecord,
+  IncidentEventType,
+} from "../data/incidentEvents";
+import { fetchIncidentTimeline } from "../data/timelineService";
 
 const MOCK_INCIDENTS = [
   { id: "mock-1", kind: "journey" as const, title: "Monitored walk", place: "Indiranagar to Koramangala", date: "10 Jun", status: "safe" as const },
@@ -199,12 +205,6 @@ export function HistoryScreen({
   );
 }
 
-import {
-  EVENT_DISPLAY_CONFIG,
-  IncidentEventRecord,
-  IncidentEventType,
-} from "../data/incidentEvents";
-import { fetchIncidentTimeline } from "../data/timelineService";
 
 const STEP_LABELS: Record<string, { title: string; tone: TimelineTone }> = {
   SOS_TRIGGERED: { title: "SOS triggered", tone: "emergency" },

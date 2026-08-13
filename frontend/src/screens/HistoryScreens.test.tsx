@@ -52,10 +52,6 @@ describe("HistoryScreens", () => {
     const { triggerSOS } = require("../services/sosOrchestratorService");
     const incidentId = await triggerSOS("BUTTON");
 
-    // Manually append the step the way the real pipeline would once
-    // behaviorAnalysisService.evaluate resolves with a decision (that resolution
-    // is async and fire-and-forget in the real pipeline; append directly here to
-    // keep this test deterministic rather than racing the fire-and-forget timer).
     const AsyncStorage = require("@react-native-async-storage/async-storage").default;
     const raw = await AsyncStorage.getItem("@aegis_incidents_v2");
     const incidents = JSON.parse(raw);

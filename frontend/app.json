@@ -21,8 +21,8 @@
     "android": {
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash-icon.png",
-        "backgroundColor": "#090A0F"
+        "backgroundColor": "#090A0F",
+        "foregroundImage": "./assets/splash-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nameisrk.aegiswomensafety",

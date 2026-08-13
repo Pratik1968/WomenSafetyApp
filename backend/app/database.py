@@ -3,7 +3,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-# Explicitly load .env from root directory or ai-service directory
 ROOT_DIR = Path(__file__).resolve().parent
 ai_service_env = ROOT_DIR / "ai-service" / ".env"
 root_env = ROOT_DIR / ".env"
@@ -27,7 +26,7 @@ if SUPABASE_URL and SUPABASE_KEY and "your-supabase-project-id" not in SUPABASE_
     except Exception as e:
         print(f"[Database Warning]: Failed to initialize Supabase client: {e}")
 else:
-        print("[Database Warning]: SUPABASE_URL or SUPABASE_KEY missing in .env. Supabase client uninitialized.")
+    print("[Database Warning]: SUPABASE_URL or SUPABASE_KEY missing in .env. Supabase client uninitialized.")
 
 def get_supabase() -> Client:
     return supabase_client

@@ -105,7 +105,47 @@ export class LocationService {
   }
 
   /**
-   * Start live GPS position tracking
+   * Calculate Haversine distance between two coordinates in kilometers
+   */
+  public calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 100) / 100;
+  }
+
+  /**
+   * Estimate Arrival Time (in minutes) based on remaining distance and average speed (km/h)
+   */
+  public calculateETA(distanceKm: number, averageSpeedKmH: number = 15): number {
+    if (distanceKm <= 0) return 0;
+    const timeHours = distanceKm / averageSpeedKmH;
+    return Math.max(1, Math.ceil(timeHours * 60));
+  }
+
+  /**
+   * Check if user is inside a target geofence radius (in meters)
+   */
+  public isInsideGeofence(
+    currentLat: number,
+    currentLng: number,
+    centerLat: number,
+    centerLng: number,
+    radiusMeters: number = 500
+  ): boolean {
+    const distKm = this.calculateDistanceKm(currentLat, currentLng, centerLat, centerLng);
+    return distKm * 1000 <= radiusMeters;
+  }
+
+  /**
+   * Start live GPS position tracking with 4-5s interval updates
    */
   public async startLocationTracking(
     callback: (location: LocationData) => void
@@ -121,8 +161,8 @@ export class LocationService {
       this.watchSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 5000,
-          distanceInterval: 10,
+          timeInterval: 4000, // 4 seconds auto update
+          distanceInterval: 5,
         },
         async (loc) => {
           const coordinates: Coordinates = {
@@ -140,7 +180,7 @@ export class LocationService {
           callback(locationData);
         }
       );
-      logger.info('Live GPS location tracking started.');
+      logger.info('Live GPS location tracking started with 4-5s auto-update interval.');
     } catch (err) {
       logger.error('Failed to start location tracking:', err);
     }
@@ -171,3 +211,4 @@ export class LocationService {
 }
 
 export const locationService = LocationService.getInstance();
+

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Text
 from app.db.base import Base
 
 class User(Base):
@@ -11,6 +11,11 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     phone = Column(String(50), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=True)
+    gender = Column(String(50), nullable=True)
+    blood_group = Column(String(20), nullable=True)
+    date_of_birth = Column(String(20), nullable=True)
+    medical_notes = Column(Text, nullable=True)
+    password_hash = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
