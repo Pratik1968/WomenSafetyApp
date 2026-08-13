@@ -9,7 +9,7 @@ describe("HomeScreen", () => {
   it("renders user greeting and status pill correctly", async () => {
     await render(<HomeScreen />);
     expect(screen.getByText("Good evening,")).toBeTruthy();
-    expect(screen.getByText("User")).toBeTruthy();
+    expect(screen.getByText("Aisha")).toBeTruthy();
     expect(screen.getByText("You're in a safe area")).toBeTruthy();
   });
 

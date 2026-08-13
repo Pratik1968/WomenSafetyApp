@@ -60,8 +60,6 @@
           "backgroundColor": "#090A0F"
         }
       ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
       [
         "expo-contacts",
         {
@@ -97,6 +95,8 @@
           "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
       ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
       "./plugins/withFakeCallTile.js"
     ]
   }
