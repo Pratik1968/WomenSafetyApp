@@ -29,6 +29,7 @@ import { contactStorageService } from "./contactStorageService";
 import { sendSilentSms, makeSilentCall } from "./sosNativeService";
 import { auth } from "./firebaseConfig";
 import { syncIncidentEvent } from "./incidentSyncService";
+import * as behaviorAnalysisService from "./behaviorAnalysisService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -171,15 +172,6 @@ async function patchIncident(
   return incidents[idx];
 }
 
-/**
- * Fire-and-forget backend sync for one pipeline step. Callers MUST NOT
- * `await` this — on poor connectivity the API client's timeout/retry
- * behavior can take 10s+ per call, and this must never delay the
- * actual SMS-sending / call-placing steps in the pipeline (see file
- * header). Never throws internally either way — a failed sync must not
- * block or fail the SOS pipeline. Skips silently if no user is signed in
- * (nothing to attribute the incident to).
- */
 async function syncStepToBackend(inc: SOSIncident, step: string, data?: Record<string, unknown>): Promise<void> {
   const firebaseUid = auth.currentUser?.uid;
   if (!firebaseUid) return;
@@ -215,8 +207,6 @@ async function appendLog(
     ],
   }));
   if (updated) {
-    // Fire-and-forget: do not await — a slow/hanging network call must
-    // never delay the SOS pipeline (see syncStepToBackend's doc comment).
     void syncStepToBackend(updated, step, data);
   }
 }
@@ -312,6 +302,9 @@ export async function getIncidentById(id: string): Promise<SOSIncident | undefin
  * @returns The incidentId (use to track / cancel this incident)
  */
 export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
+  // Module 18: fresh incident, fresh behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Ensure native Android runtime permissions (SEND_SMS, CALL_PHONE, POST_NOTIFICATIONS)
   await ensureAndroidPermissions();
 
@@ -334,8 +327,6 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   const incidents = await readIncidents();
   incidents.unshift(incident);
   await writeIncidents(incidents);
-  // Fire-and-forget: do not await — a slow/hanging network call must
-  // never delay the SOS pipeline (see syncStepToBackend's doc comment).
   void syncStepToBackend(incident, "SOS_TRIGGERED", { source });
 
   // ── Step 2: Get location (with fallback) ────────────────────
@@ -420,6 +411,20 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
           lat: loc.lat,
           lon: loc.lon,
         });
+
+        // Module 18: AI Behavior Analysis — best-effort, never blocks the
+        // location watcher. See behaviorAnalysisService.ts for the signal
+        // engine and docs/superpowers/specs/2026-08-13-module18-behavior-analysis-design.md
+        // for the design.
+        behaviorAnalysisService
+          .evaluate({ lat: loc.lat, lon: loc.lon, timestampMs: loc.timestamp })
+          .then((alert) => {
+            if (!alert) return;
+            return appendLog(incidentId, alert.eventType, { detail: alert.detail });
+          })
+          .catch(() => {
+            // Best-effort — a failed behavior check must never affect the SOS pipeline.
+          });
       }
     );
     await appendLog(incidentId, "LIVE_TRACKING_STARTED", {});
@@ -446,6 +451,9 @@ export async function cancelSOS(
   incidentId: string,
   status: "resolved" | "cancelled" = "resolved"
 ): Promise<void> {
+  // Module 18: incident is ending, clear the behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Stop live location tracking
   if (locationWatcher) {
     locationWatcher.remove();

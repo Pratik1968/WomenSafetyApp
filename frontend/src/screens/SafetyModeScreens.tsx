@@ -21,7 +21,6 @@ import {
   Navigation,
   BatteryMedium,
   Users,
-  PhoneCall,
   Siren,
   Volume2,
   ShieldAlert,
@@ -45,14 +44,15 @@ import { JourneyConfig, JourneyContact, JourneyDestination, TransportMode } from
 const STEP_COUNT = 4;
 
 const PLACES = [
-  { id: "p1", name: "Home", detail: "100 Ft Road, Indiranagar", tag: "Saved" },
-  { id: "p2", name: "Office", detail: "Koramangala 5th Block", tag: "Saved" },
-  { id: "p3", name: "Starbucks Indiranagar", detail: "12th Main Road", tag: "Recent" },
+  { id: "p1", name: "Home", detail: "100 Ft Road, Indiranagar", tag: "Recent" },
+  { id: "p2", name: "Office", detail: "Prestige Tech Park, Marathahalli", tag: "Saved" },
+  { id: "p3", name: "Gym", detail: "Cult Fit, 12th Main Road", tag: "Saved" },
+  { id: "p4", name: "Priya's Place", detail: "4th Block, Koramangala", tag: "Recent" },
 ];
 
 const TRANSPORT = [
-  { id: "walk", label: "Walking", detail: "Detailed step pacing & dark spot alerts", icon: Footprints },
-  { id: "bike", label: "Two-wheeler", detail: "Helmet impact & speed drop detection", icon: Bike },
+  { id: "walk", label: "Walking", detail: "Movement speed & stationary checks", icon: Footprints },
+  { id: "bike", label: "Two Wheeler", detail: "Continuous GPS & high-speed route tracking", icon: Bike },
   { id: "cab", label: "Cab / Auto", detail: "Route drift & unexpected stop checks", icon: Car },
   { id: "transit", label: "Public Transit", detail: "Stop notifications & safe exit monitoring", icon: Bus },
 ];
@@ -201,7 +201,7 @@ export function JourneyTransportScreen({
   );
 }
 
-/* Step 3: Contacts — populated from real Supabase emergency contacts */
+/* Step 3: Contacts — populated from real emergency contacts */
 export function JourneyContactsScreen({
   onBack,
   onNext,
@@ -214,6 +214,7 @@ export function JourneyContactsScreen({
   const { contacts: realContacts } = useEmergencyContacts();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Auto-select all contacts by default when they load
   useEffect(() => {
     if (realContacts.length > 0 && selectedIds.length === 0) {
       setSelectedIds(realContacts.map((c) => c.id));
@@ -279,19 +280,18 @@ export function JourneyContactsScreen({
       <View style={styles.footerStack}>
         <AppButton onPress={handleContinue}>
           {selectedIds.length > 0
-            ? `Continue with ${selectedIds.length} contact${selectedIds.length === 1 ? '' : 's'}`
-            : 'Continue without contacts'}
+            ? `Share with ${selectedIds.length} contact${selectedIds.length > 1 ? "s" : ""}`
+            : "Continue without sharing"}
         </AppButton>
-        <AppButton variant="ghost" size="md" onPress={() => { onContactsSelected?.([]); onNext?.(); }}>
-          Skip for now
+        <AppButton variant="ghost" onPress={onNext}>
+          Skip
         </AppButton>
       </View>
     </View>
   );
 }
 
-/* ---------------------------------- AI Voice Recognition & Detection Card */
-
+/* Voice Detection Card for Step 4 */
 export function SafetyModeVoiceCard() {
   const {
     recognitionState,
@@ -306,43 +306,45 @@ export function SafetyModeVoiceCard() {
     changeLanguage,
   } = useVoiceState();
 
-  const { latestEmergencyEvent } = useJourney();
+  const { emergencyActive: _isDetected, latestEmergencyEvent } = useJourney();
 
   useEffect(() => {
     console.log("Voice screen mounted");
   }, []);
 
+
   const [showLanguages, setShowLanguages] = useState(false);
 
   const activeTranscript = recognizedText || partialText;
-  const isDetected = !!latestEmergencyEvent;
+  const isDetected = _isDetected || !!latestEmergencyEvent;
+
 
   return (
     <Card style={styles.voiceCard}>
       <View style={styles.voiceHeader}>
         <View style={styles.voiceTitleRow}>
-          <Mic size={20} color={colors.primary} />
-          <Text style={styles.voiceTitle}>AI Voice SOS & Keyword Detection</Text>
+          <Volume2 size={18} color={isListening ? colors.primary : colors.mutedForeground} />
+          <Text style={styles.voiceTitle}>Background Voice Detection</Text>
         </View>
         {isDetected ? (
           <Badge tone="emergency">Keyword Detected</Badge>
         ) : isListening ? (
-          <Badge tone="brand">Listening...</Badge>
+          <Badge tone="success">Listening</Badge>
         ) : recognitionState === "PROCESSING" ? (
           <Badge tone="warning">Processing...</Badge>
         ) : (
-          <Badge tone="neutral">Idle</Badge>
+          <Badge tone="neutral">Standby</Badge>
         )}
       </View>
 
       <Text style={styles.voiceSub}>
-        Hands-free voice recognition automatically detects distress keywords like "Help", "Emergency", or "Save me".
+        Listens for distress keywords like <Text style={{ fontWeight: "700" }}>"Help", "Bachao", "Save me"</Text> to trigger an auto-alert.
       </Text>
 
       <View style={styles.transcriptBox}>
-        <Text style={styles.transcriptLabel}>Live Speech Transcript:</Text>
+        <Text style={styles.transcriptLabel}>Live Audio Transcript</Text>
         <Text style={[styles.transcriptText, !activeTranscript && styles.transcriptPlaceholder]}>
-          {activeTranscript ? `"${activeTranscript}"` : "Speak to test keyword detection..."}
+          {activeTranscript ? `"${activeTranscript}"` : "Say emergency keywords to trigger SOS..."}
         </Text>
 
         {isListening && (
@@ -410,7 +412,6 @@ export function SafetyModeVoiceCard() {
         size="md"
         leading={isListening ? <MicOff size={16} color={colors.foreground} /> : <Mic size={16} color={colors.primaryForeground} />}
         onPress={isListening ? stopListening : () => {
-          console.log("Voice button pressed");
           startListening(currentLanguage);
         }}
       >
@@ -484,6 +485,12 @@ export function JourneyActiveScreen({
   const { emergencyActive, latestEmergencyEvent, endJourney } = useJourney();
 
   useEffect(() => {
+    if (emergencyActive) {
+      console.log('[SafetyModeScreens] Emergency modal opened');
+    }
+  }, [emergencyActive]);
+
+  useEffect(() => {
     let isActive = true;
     (async () => {
       try {
@@ -528,7 +535,7 @@ export function JourneyActiveScreen({
         <View style={styles.mapContainerStub}>
           <MapPin size={24} color={offRoute ? colors.warning : colors.primary} />
           <Text style={styles.mapStubHeading}>Live Journey Track</Text>
-          <Text style={styles.mapStubDetail}>5.7 km travelled · 2.7 km to go</Text>
+          <Text style={styles.mapStubDetail}>5.7 km travelled • 2.7 km to go</Text>
         </View>
 
         {state === "escalating" ? (
@@ -560,7 +567,7 @@ export function JourneyActiveScreen({
         ) : null}
 
         <View style={styles.journeyMetaRow}>
-          <Text style={styles.journeyMetaTitle}>Office → Home</Text>
+          <Text style={styles.journeyMetaTitle}>Office — Home</Text>
           <Badge tone={offRoute ? "warning" : "success"}>{offRoute ? "Attention" : "On track"}</Badge>
         </View>
 
@@ -577,63 +584,55 @@ export function JourneyActiveScreen({
             <Text style={styles.metricValue}>62%</Text>
             <Text style={styles.metricLabel}>Battery</Text>
           </View>
-          <View style={styles.metricCard}>
-            <Users size={16} color={colors.primary} />
-            <Text style={styles.metricValue}>2</Text>
-            <Text style={styles.metricLabel}>Watching</Text>
-          </View>
         </View>
       </ScrollView>
 
       <View style={styles.activeActionsRow}>
-        <Pressable style={styles.activeActionBtn} onPress={onSos}>
-          <Siren size={18} color={colors.emergencyForeground} />
+        <Pressable onPress={onSos} style={styles.activeActionBtn}>
+          <Siren size={20} color={colors.emergencyForeground} />
           <Text style={styles.activeActionBtnSosText}>SOS</Text>
         </Pressable>
-        <Pressable style={[styles.activeActionBtn, styles.activeActionBtnArrived]} onPress={handleEnd}>
-          <Check size={18} color={colors.foreground} />
+        <Pressable onPress={handleEnd} style={[styles.activeActionBtn, styles.activeActionBtnArrived]}>
+          <Check size={20} color={colors.foreground} />
           <Text style={styles.activeActionBtnArrivedText}>Arrived</Text>
         </Pressable>
       </View>
 
+      {/* ── Emergency Active Overlay ─────────────────────────────────────────── */}
       {emergencyActive && (
         <View style={styles.emergencyOverlay}>
           <View style={styles.emergencyOverlayCard}>
             <View style={styles.emergencyOverlayIconRow}>
-              <ShieldAlert size={32} color={colors.emergency} />
+              <ShieldAlert size={36} color={colors.emergency} />
             </View>
-            <Text style={styles.emergencyOverlayTitle}>Emergency Active</Text>
-            {latestEmergencyEvent && (
-              <>
-                <Text style={styles.emergencyOverlayKeyword}>
-                  "{latestEmergencyEvent.detectedKeyword}" detected
-                </Text>
-                <Text style={styles.emergencyOverlayDetail}>
-                  {latestEmergencyEvent.location.address || 'Location captured'}
-                </Text>
-                <Text style={styles.emergencyOverlayDetail}>
-                  {new Date(latestEmergencyEvent.timestamp).toLocaleTimeString()}
-                </Text>
-              </>
-            )}
+            <Text style={styles.emergencyOverlayTitle}>EMERGENCY DETECTED</Text>
+            {latestEmergencyEvent?.detectedKeyword ? (
+              <Text style={styles.emergencyOverlayKeyword}>
+                Keyword: "{latestEmergencyEvent.detectedKeyword}"
+              </Text>
+            ) : null}
+            <Text style={styles.emergencyOverlayDetail}>
+              Emergency keyword recognized by speech monitor. Broadcasting live GPS coordinates to emergency contacts.
+            </Text>
             <Text style={styles.emergencyOverlayContacts}>
-              Your emergency contacts have been notified.
+              Contacts & Police notified.
             </Text>
             <AppButton
               variant="destructive"
-              size="md"
-              onPress={onSos}
+              size="lg"
+              leading={<Siren size={20} color="#fff" />}
               style={styles.emergencyOverlaySosBtn}
+              onPress={onSos}
             >
-              Send Full SOS
+              Open SOS Screen
             </AppButton>
             <AppButton
-              variant="ghost"
+              variant="secondary"
               size="md"
-              onPress={handleEnd}
               style={styles.emergencyOverlayEndBtn}
+              onPress={handleEnd}
             >
-              End Journey
+              Cancel / I am Safe
             </AppButton>
           </View>
         </View>
@@ -646,18 +645,15 @@ export function JourneyActiveScreen({
 export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
   return (
     <View style={styles.summaryScreen}>
-      <Aurora />
       <View style={styles.summaryContent}>
-        <SuccessCheck size={96} />
-        <Text style={styles.summaryTitle}>You arrived safely</Text>
-        <Text style={styles.summarySub}>
-          Safety Mode ended. Your emergency contacts have been notified that you arrived safely.
-        </Text>
+        <SuccessCheck />
+        <Text style={styles.summaryTitle}>You're home safe.</Text>
+        <Text style={styles.summarySub}>Your emergency contacts have been notified that you've arrived safely.</Text>
 
         <Card style={styles.summaryCard}>
           <View style={styles.summaryMetricsGrid}>
             <View>
-              <Text style={styles.summaryMetricValue}>24 min</Text>
+              <Text style={styles.summaryMetricValue}>28m</Text>
               <Text style={styles.summaryMetricLabel}>Duration</Text>
             </View>
             <View>
@@ -665,8 +661,8 @@ export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
               <Text style={styles.summaryMetricLabel}>Distance</Text>
             </View>
             <View>
-              <Text style={[styles.summaryMetricValue, { color: colors.success }]}>Calm</Text>
-              <Text style={styles.summaryMetricLabel}>Route rating</Text>
+              <Text style={styles.summaryMetricValue}>3</Text>
+              <Text style={styles.summaryMetricLabel}>Contacts shared</Text>
             </View>
           </View>
         </Card>
@@ -679,8 +675,71 @@ export function JourneySummaryScreen({ onDone }: { onDone?: () => void }) {
   );
 }
 
+export function SafetyModeScreen({
+  onDone,
+  onSos,
+}: {
+  onDone?: () => void;
+  onSos?: () => void;
+}) {
+  const { isJourneyActive, startJourney, endJourney } = useJourney();
+
+  const [step, setStep] = useState<"destination" | "transport" | "contacts" | "consent" | "active" | "summary">(
+    isJourneyActive ? "active" : "destination"
+  );
+
+  const [selectedDestination] = useState<JourneyDestination>({ name: "Home", address: "100 Ft Road, Indiranagar" });
+  const [selectedTransport] = useState<TransportMode>("cab");
+  const [selectedContacts, setSelectedContacts] = useState<JourneyContact[]>([]);
+
+  useEffect(() => {
+    if (isJourneyActive && step !== "active" && step !== "summary") {
+      setStep("active");
+    }
+  }, [isJourneyActive]);
+
+  const handleStart = async () => {
+    const config: JourneyConfig = {
+      destination: selectedDestination,
+      transport: selectedTransport,
+      contacts: selectedContacts,
+    };
+    await startJourney(config);
+    setStep("active");
+  };
+
+  const handleEnd = () => {
+    endJourney();
+    setStep("summary");
+  };
+
+  if (step === "destination") {
+    return <JourneyDestinationScreen onBack={onDone} onNext={() => setStep("transport")} />;
+  }
+  if (step === "transport") {
+    return <JourneyTransportScreen onBack={() => setStep("destination")} onNext={() => setStep("contacts")} />;
+  }
+  if (step === "contacts") {
+    return (
+      <JourneyContactsScreen
+        onBack={() => setStep("transport")}
+        onNext={() => setStep("consent")}
+        onContactsSelected={(contacts) => setSelectedContacts(contacts)}
+      />
+    );
+  }
+  if (step === "consent") {
+    return <JourneyConsentScreen onBack={() => setStep("contacts")} onStart={handleStart} />;
+  }
+  if (step === "active") {
+    return <JourneyActiveScreen onEnd={handleEnd} onSos={onSos} />;
+  }
+  return <JourneySummaryScreen onDone={onDone} />;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  summaryScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
   stepHeaderWrap: { paddingHorizontal: 32, paddingTop: 12, paddingBottom: 16 },
   stepHeaderTitle: { fontSize: 24, fontWeight: "700", color: colors.foreground, marginTop: 16, letterSpacing: -0.2 },
   stepHeaderBody: { fontSize: 14, color: colors.mutedForeground, marginTop: 6, lineHeight: 20 },
@@ -688,12 +747,12 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    height: 52,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.xl,
     paddingHorizontal: 16,
+    height: 48,
     gap: 12,
   },
   searchText: { fontSize: 15 },
@@ -715,8 +774,8 @@ const styles = StyleSheet.create({
   placeItemPicked: { borderColor: colors.primary, backgroundColor: `${colors.primary}08` },
   placeIcon: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   placeText: { flex: 1 },
-  placeTitle: { fontSize: 15, fontWeight: "600", color: colors.foreground },
-  placeDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 1 },
+  placeTitle: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  placeDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
   checkBadge: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   transportList: { gap: 12, marginTop: 16 },
   transportItem: {
@@ -725,7 +784,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl2,
+    borderRadius: radii.xl,
     padding: 16,
     gap: 14,
   },
@@ -735,9 +794,9 @@ const styles = StyleSheet.create({
   transportText: { flex: 1 },
   transportLabel: { fontSize: 16, fontWeight: "600", color: colors.foreground },
   transportDetail: { fontSize: 13, color: colors.mutedForeground, marginTop: 2 },
-  emptyContacts: { alignItems: "center", justifyContent: "center", paddingVertical: 40, gap: 12 },
+  emptyContacts: { alignItems: "center", justifyContent: "center", paddingVertical: 48, gap: 12 },
   emptyContactsText: { fontSize: 14, color: colors.mutedForeground, textAlign: "center", lineHeight: 20 },
-  contactsList: { gap: 12, marginTop: 16 },
+  contactsList: { gap: 10 },
   contactItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -826,67 +885,13 @@ const styles = StyleSheet.create({
   emergencyOverlayContacts: { fontSize: 14, color: colors.foreground, textAlign: "center" },
   emergencyOverlaySosBtn: { width: "100%", marginTop: 8 },
   emergencyOverlayEndBtn: { width: "100%" },
-  summaryScreen: { flex: 1, backgroundColor: colors.background, justifyContent: "space-between" },
-  summaryContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-  summaryTitle: { fontSize: 28, fontWeight: "700", color: colors.foreground, marginTop: 24, textAlign: "center" },
-  summarySub: { fontSize: 15, color: colors.mutedForeground, marginTop: 8, textAlign: "center", lineHeight: 22 },
-  summaryCard: { marginTop: 24, width: "100%", padding: 20 },
+  summaryContent: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
+  summaryTitle: { fontSize: 26, fontWeight: "700", color: colors.foreground, marginTop: 20, textAlign: "center" },
+  summarySub: { fontSize: 15, color: colors.mutedForeground, textAlign: "center", marginTop: 8, lineHeight: 22 },
+  summaryCard: { width: "100%", marginTop: 24, padding: 20 },
   summaryMetricsGrid: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  summaryMetricValue: { fontSize: 20, fontWeight: "700", color: colors.foreground, textAlign: "center" },
-  summaryMetricLabel: { fontSize: 12, color: colors.mutedForeground, marginTop: 4, textAlign: "center" },
-  footer: { paddingHorizontal: 32, paddingBottom: 24 },
-  footerStack: { paddingHorizontal: 32, paddingBottom: 24, gap: 8 },
-});export function SafetyModeScreen({
-  onDone,
-  onSos,
-}: {
-  onDone?: () => void;
-  onSos?: () => void;
-}) {
-  const [step, setStep] = useState<"destination" | "transport" | "contacts" | "consent" | "active" | "summary">("destination");
-
-  const [selectedDestination, setSelectedDestination] = useState<JourneyDestination>({ name: "Home", address: "100 Ft Road, Indiranagar" });
-  const [selectedTransport, setSelectedTransport] = useState<TransportMode>("cab");
-  const [selectedContacts, setSelectedContacts] = useState<JourneyContact[]>([]);
-
-  const { startJourney, endJourney } = useJourney();
-
-  const handleStart = async () => {
-    const config: JourneyConfig = {
-      destination: selectedDestination,
-      transport: selectedTransport,
-      contacts: selectedContacts,
-    };
-    await startJourney(config);
-    setStep("active");
-  };
-
-  const handleEnd = () => {
-    endJourney();
-    setStep("summary");
-  };
-
-  if (step === "destination") {
-    return <JourneyDestinationScreen onBack={onDone} onNext={() => setStep("transport")} />;
-  }
-  if (step === "transport") {
-    return <JourneyTransportScreen onBack={() => setStep("destination")} onNext={() => setStep("contacts")} />;
-  }
-  if (step === "contacts") {
-    return (
-      <JourneyContactsScreen
-        onBack={() => setStep("transport")}
-        onNext={() => setStep("consent")}
-        onContactsSelected={(contacts) => setSelectedContacts(contacts)}
-      />
-    );
-  }
-  if (step === "consent") {
-    return <JourneyConsentScreen onBack={() => setStep("contacts")} onStart={handleStart} />;
-  }
-  if (step === "active") {
-    return <JourneyActiveScreen onEnd={handleEnd} onSos={onSos} />;
-  }
-  return <JourneySummaryScreen onDone={onDone} />;
-}
-
+  summaryMetricValue: { fontSize: 18, fontWeight: "700", color: colors.foreground, textAlign: "center" },
+  summaryMetricLabel: { fontSize: 12, color: colors.mutedForeground, textAlign: "center", marginTop: 2 },
+  footer: { paddingHorizontal: 20, paddingBottom: 24 },
+  footerStack: { paddingHorizontal: 20, paddingBottom: 24, gap: 8 },
+});

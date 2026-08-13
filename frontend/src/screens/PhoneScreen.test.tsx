@@ -21,7 +21,6 @@ test("continue is disabled until the number reaches the country's digit length, 
   await act(async () => {
     fireEvent.press(screen.getByText("Continue"));
   });
-  
   await waitFor(() => {
     expect(onContinue).toHaveBeenCalledWith("+919876543210", expect.anything());
   });

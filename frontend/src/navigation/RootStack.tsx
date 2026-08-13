@@ -4,6 +4,7 @@ import { NavigationContainer, useNavigationContainerRef } from "@react-navigatio
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
+import { useShakeDetector } from "../hooks/useShakeDetector";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { PhoneScreen } from "../screens/PhoneScreen";
 import { OtpScreen } from "../screens/OtpScreen";
@@ -32,7 +33,6 @@ import { ReportScreen } from "../screens/ReportScreen";
 import { CommunityReportsScreen } from "../screens/CommunityReportsScreen";
 import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { HomeStubScreen } from "../screens/HomeStubScreen";
-import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { WearableScreen } from "../screens/WearableScreen";
 import { IncidentsScreen } from "../screens/IncidentsScreen";
 import { NewIncidentScreen } from "../screens/NewIncidentScreen";
@@ -42,6 +42,7 @@ import { AdminAuthScreen } from "../screens/AdminAuthScreen";
 import { AdminDashboardScreen } from "../screens/AdminDashboardScreen";
 import { AdminUsersScreen } from "../screens/AdminUsersScreen";
 import { AdminIncidentsScreen } from "../screens/AdminIncidentsScreen";
+import { VoiceTriggerConfigScreen, VoiceTrainingScreen } from "../modules/voice";
 import { loadAdminSession, adminLogout } from "../data/adminAuth";
 import { type TabKey } from "../components/app/BottomNav";
 import { saveProfile, clearCurrentProfile } from "../services/profileService";
@@ -80,13 +81,14 @@ export type RootStackParamList = {
   UploadEvidence: { incidentId?: string } | undefined;
   EvidenceDetail: { id?: string } | undefined;
   HomeStub: undefined;
-  IncomingCall: undefined;
   Wearable: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminIncidents: undefined;
   FaceVerification: undefined;
   FaceRegistration: undefined;
+  VoiceTriggerConfig: undefined;
+  VoiceTraining: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -219,7 +221,7 @@ function SetupRouteScreen({ navigation }: P<"Setup">) {
       navigation.replace("Permissions");
     } catch (err: any) {
       setSaving(false);
-      console.warn("Could not save profile to Supabase:", err);
+      console.warn("Could not save profile to backend/database:", err);
       Alert.alert(
         "Couldn't save your profile",
         "We weren't able to reach the server to save your safety profile. Check your connection and try again.",
@@ -281,7 +283,7 @@ function SetupRouteScreen({ navigation }: P<"Setup">) {
           if (info?.allergies?.trim()) parts.push(`Allergies: ${info.allergies.trim()}`);
           if (info?.conditions?.trim()) parts.push(`Conditions: ${info.conditions.trim()}`);
           if (info?.notes?.trim()) parts.push(`Notes: ${info.notes.trim()}`);
-          profileData.current.medical_notes = parts.length > 0 ? parts.join(" · ") : undefined;
+          profileData.current.medical_notes = parts.length > 0 ? parts.join(" • ") : undefined;
           advanceTo("Done");
         }}
         onSkip={() => advanceTo("Done")}
@@ -319,6 +321,7 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
         else if (action === "Register Face") navigation.navigate("FaceRegistration");
 
+        else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
       }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
@@ -364,7 +367,7 @@ function HistoryRouteScreen({ navigation }: P<"History">) {
         else if (t === "safety") navigation.navigate("Safety");
         else if (t === "profile") navigation.navigate("Profile");
       }}
-      onOpen={(incidentId: string) => navigation.navigate("IncidentDetail", { incidentId })}
+      onOpen={(incidentId?: string) => navigation.navigate("IncidentDetail", { incidentId })}
       onAssistant={() => navigation.navigate("Assistant")}
       onSos={() => navigation.navigate("Sos", { state: "active" })}
     />
@@ -462,10 +465,6 @@ function EvidenceDetailRouteScreen({ navigation, route }: P<"EvidenceDetail">) {
   return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
 }
 
-function IncomingCallRouteScreen({ navigation }: P<"IncomingCall">) {
-  return <IncomingCallScreen />;
-}
-
 function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
   return (
     <AdminDashboardScreen
@@ -523,12 +522,16 @@ function WebAdminApp() {
 function MobileApp() {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
 
+  useShakeDetector(() => {
+    if (navigationRef.isReady()) {
+      navigationRef.navigate("Sos", { state: "active" });
+    }
+  });
+
   useEffect(() => {
-    const subscription = addEmergencyActionListener((action) => {
+    const subscription = addEmergencyActionListener((action: string) => {
       if (navigationRef.isReady()) {
-        if (action === "FAKE_CALL") {
-          navigationRef.navigate("IncomingCall");
-        } else if (action === "SOS") {
+        if (action === "SOS") {
           navigationRef.navigate("Sos", { state: "active" });
         } else if (action === "LIVE_LOCATION") {
           navigationRef.navigate("Home");
@@ -571,11 +574,12 @@ function MobileApp() {
         <Stack.Screen name="UploadEvidence" component={UploadEvidenceRouteScreen} />
         <Stack.Screen name="EvidenceDetail" component={EvidenceDetailRouteScreen} />
         <Stack.Screen name="HomeStub" component={HomeStubScreen} />
-        <Stack.Screen name="IncomingCall" component={IncomingCallRouteScreen} />
         <Stack.Screen name="Wearable" component={WearableScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardRouteScreen} />
         <Stack.Screen name="AdminUsers" component={AdminUsersRouteScreen} />
         <Stack.Screen name="AdminIncidents" component={AdminIncidentsRouteScreen} />
+        <Stack.Screen name="VoiceTriggerConfig" component={VoiceTriggerConfigScreen} />
+        <Stack.Screen name="VoiceTraining" component={VoiceTrainingScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

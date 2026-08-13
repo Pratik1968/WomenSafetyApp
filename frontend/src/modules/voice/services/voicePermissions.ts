@@ -14,23 +14,39 @@ export interface VoicePermissionResult {
 
 export const requestMicrophonePermissions = async (): Promise<VoicePermissionResult> => {
   try {
-    console.log("Checking microphone permission...");
     if (Platform.OS === 'ios') {
       logger.info('iOS Microphone & Speech permissions verified via Info.plist');
-      console.log("Permission result:", "granted");
-      console.log("Permission granted");
       return { granted: true };
     }
 
     if (Platform.OS === 'android') {
+      // Check/request Notification permission for Android 13+ (API 33+) foreground service
+      if (Platform.Version >= 33 && (PermissionsAndroid.PERMISSIONS as any).POST_NOTIFICATIONS) {
+        try {
+          const hasNotifPerm = await PermissionsAndroid.check(
+            (PermissionsAndroid.PERMISSIONS as any).POST_NOTIFICATIONS
+          );
+          if (!hasNotifPerm) {
+            await PermissionsAndroid.request(
+              (PermissionsAndroid.PERMISSIONS as any).POST_NOTIFICATIONS,
+              {
+                title: 'Notification Access Required',
+                message: 'WomenSafty requires notification access to keep safety monitoring active in the background.',
+                buttonPositive: 'Allow',
+              }
+            );
+          }
+        } catch (notifErr) {
+          logger.warn('Failed to request POST_NOTIFICATIONS permission:', notifErr);
+        }
+      }
+
       const isAlreadyGranted = await PermissionsAndroid.check(
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
       );
 
       if (isAlreadyGranted) {
         logger.info('Android RECORD_AUDIO permission already granted.');
-        console.log("Permission result:", PermissionsAndroid.RESULTS.GRANTED);
-        console.log("Permission granted");
         return { granted: true };
       }
 
@@ -44,13 +60,9 @@ export const requestMicrophonePermissions = async (): Promise<VoicePermissionRes
         }
       );
 
-      console.log("Permission result:", permission);
-
       if (permission === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log("Permission granted");
         return { granted: true };
       } else {
-        console.log("Permission denied");
         return {
           granted: false,
           message: 'Microphone permission was denied.',
@@ -58,12 +70,9 @@ export const requestMicrophonePermissions = async (): Promise<VoicePermissionRes
       }
     }
 
-    console.log("Permission result:", "granted");
-    console.log("Permission granted");
     return { granted: true };
   } catch (err) {
     logger.error('Error requesting microphone permissions', err);
-    console.log("Permission denied");
     return {
       granted: false,
       message: 'Failed to verify native microphone permissions.',

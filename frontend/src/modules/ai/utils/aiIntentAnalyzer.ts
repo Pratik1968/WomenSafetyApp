@@ -3,8 +3,8 @@
  * Analyzes incoming user messages / speech transcripts and classifies into 8 supported intents:
  * (NORMAL_CHAT, EMERGENCY, FIRST_AID, LEGAL, POLICE_LOOKUP, HOSPITAL_LOOKUP, SAFETY_GUIDANCE, EMOTIONAL_SUPPORT)
  *
- * CRITICAL RULE: Gemini NEVER decides whether an emergency exists.
- * Emergency classification triggers EmergencyService dispatch immediately before querying Gemini.
+ * CRITICAL RULE: AI model NEVER decides whether an emergency exists.
+ * Emergency classification triggers EmergencyService dispatch immediately before querying AI.
  */
 
 import { AISafetyIntent } from '../types/ai.types';

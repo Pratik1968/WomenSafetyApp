@@ -27,3 +27,4 @@ yarn-error.*
 # ---- IDE ----
 
 .idea/
+backend/credentials/firebase-service-account.json

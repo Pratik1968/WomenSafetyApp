@@ -26,7 +26,7 @@ export const createConversationSession = (userId: string): AIConversationSession
     messages: [
       createAIMessage(
         'assistant',
-        "Hi, I'm Aegis, your AI Safety Companion. How can I help protect or assist you today?",
+        "Hi, I'm your AI Safety Companion. How can I help protect or assist you today?",
         'NORMAL_CHAT'
       ),
     ],

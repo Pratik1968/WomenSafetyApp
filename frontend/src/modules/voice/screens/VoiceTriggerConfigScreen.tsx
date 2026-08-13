@@ -10,7 +10,6 @@ import { colors } from '../../../theme/tokens';
 import { NavBar } from '../../../components/ds/NavBar';
 import { Card } from '../../../components/ds/Card';
 import { AppButton } from '../../../components/ds/AppButton';
-import { Badge } from '../../../components/ds/Badge';
 import { VoiceWaveformVisualizer } from '../components/VoiceWaveformVisualizer';
 import { KeywordDetectorBadge } from '../components/KeywordDetectorBadge';
 import { useVoiceState } from '../../../context/VoiceContext';
@@ -18,8 +17,6 @@ import { keywordDetectionService } from '../../emergency/services/keywordDetecti
 import { SUPPORTED_LANGUAGES, SupportedLanguage } from '../types/voiceRecognition.types';
 
 export const VoiceTriggerConfigScreen: React.FC = () => {
-  const [showHistoryScreen, setShowHistoryScreen] = useState(false);
-
   // Voice Context for Speech-to-Text Stream
   const {
     recognitionState,
@@ -28,15 +25,14 @@ export const VoiceTriggerConfigScreen: React.FC = () => {
     partialText,
     currentLanguage,
     volumeLevel,
-    speechError,
     startListening,
     stopListening,
     cancelListening,
     changeLanguage,
   } = useVoiceState();
 
-  // Local keyword detection: evaluate current transcript directly (this is a standalone config screen)
-  const [sensitivityThreshold, setSensitivityThreshold] = useState<number>(0.6);
+  // Local keyword detection
+  const [sensitivityThreshold] = useState<number>(0.6);
 
   const activeText = (recognizedText || partialText || '').trim();
   const detectionResult = useMemo(() => {
@@ -48,7 +44,6 @@ export const VoiceTriggerConfigScreen: React.FC = () => {
     if (isListening) {
       await stopListening();
     } else {
-      console.log("Voice button pressed");
       await startListening();
     }
   };
@@ -183,10 +178,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-  },
-  historyNavBtn: {
-    height: 34,
-    paddingHorizontal: 10,
   },
   btnRow: {
     flexDirection: 'row',
