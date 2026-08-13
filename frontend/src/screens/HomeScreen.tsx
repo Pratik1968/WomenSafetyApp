@@ -33,6 +33,7 @@ import { BottomNav, type TabKey } from "../components/app/BottomNav";
 import { Dialog } from "../components/ds/Dialog";
 import { AppButton } from "../components/ds/AppButton";
 import { getMyProfile } from "../services/profileService";
+import { locationService } from "../modules/location/services/locationService";
 import { SosCountdownOverlay } from "../components/app/SosCountdownOverlay";
 import {
   startShakeDetection,
@@ -134,6 +135,30 @@ export function HomeScreen({
   const [pressed, setPressed] = useState(false);
   const loading = state === "loading";
 
+  // ── Real-time area name lookup ────────────────────────────────
+  const [userAreaName, setUserAreaName] = useState<string>("Mandadam");
+
+  useEffect(() => {
+    locationService
+      .getCurrentLocation()
+      .then((loc) => {
+        if (loc?.address) {
+          const area =
+            loc.address.city ||
+            loc.address.street ||
+            loc.address.region;
+          if (area) {
+            setUserAreaName(area);
+            return;
+          }
+        }
+        if (loc?.coordinates) {
+          setUserAreaName(`${loc.coordinates.latitude.toFixed(4)}, ${loc.coordinates.longitude.toFixed(4)}`);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Countdown overlay state ───────────────────────────────────
   const [countdownVisible, setCountdownVisible] = useState(false);
   const [countdownSource, setCountdownSource] = useState<SOSTriggerSource>("BUTTON");
@@ -185,10 +210,10 @@ export function HomeScreen({
 
   const status =
     state === "monitoring"
-      ? { tone: "brand", title: "Safety Mode is on", sub: "Office — Home • arriving 9:36 PM" }
+      ? { tone: "brand", title: "Safety Mode is on", sub: `${userAreaName} • arriving 9:36 PM` }
       : state === "caution"
-      ? { tone: "warning", title: "Extra care tonight", sub: "3 recent reports within 500 m" }
-      : { tone: "success", title: "You're in a safe area", sub: "Indiranagar • updated just now" };
+      ? { tone: "warning", title: "Extra care tonight", sub: `3 recent reports in ${userAreaName}` }
+      : { tone: "success", title: "You're in a safe area", sub: `${userAreaName} • updated just now` };
 
   return (
     <View style={styles.screen}>

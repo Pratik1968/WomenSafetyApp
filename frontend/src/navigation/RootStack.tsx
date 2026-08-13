@@ -27,6 +27,7 @@ import { HistoryScreen, IncidentDetailScreen } from "../screens/HistoryScreens";
 import { ProfileScreen, SettingsScreen, DataPrivacyScreen, ManageContactsScreen } from "../screens/ProfileScreens";
 import { SosScreen, type SosState } from "../screens/SosScreen";
 import { SafeRouteScreen } from "../screens/SafeRouteScreen";
+import { FamilyLiveTrackingScreen } from "../screens/FamilyLiveTrackingScreen";
 import { NearbyHelpScreen } from "../screens/NearbyHelpScreen";
 import { AssistantScreen } from "../screens/AssistantScreen";
 import { ReportScreen } from "../screens/ReportScreen";
@@ -88,6 +89,7 @@ export type RootStackParamList = {
   AdminIncidents: undefined;
   VoiceTriggerConfig: undefined;
   VoiceTraining: undefined;
+  FamilyLiveTracking: { sessionId?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -445,6 +447,16 @@ function IncomingCallRouteScreen({ navigation }: P<"IncomingCall">) {
   return <IncomingCallScreen />;
 }
 
+function FamilyLiveTrackingRouteScreen({ navigation, route }: P<"FamilyLiveTracking">) {
+  return (
+    <FamilyLiveTrackingScreen
+      sessionId={route.params?.sessionId}
+      onBack={() => navigation.goBack()}
+      onEmergencyAlert={() => navigation.navigate("Sos", { state: "active" })}
+    />
+  );
+}
+
 function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
   return (
     <AdminDashboardScreen
@@ -540,7 +552,15 @@ function MobileApp() {
         <Stack.Screen name="History" component={HistoryRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Profile" component={ProfileRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Sos" component={SosRouteScreen} />
-        <Stack.Screen name="SafeRoute" component={SafeRouteScreen} />
+        <Stack.Screen name="SafeRoute">
+          {({ navigation }: P<"SafeRoute">) => (
+            <SafeRouteScreen
+              onBack={() => navigation.goBack()}
+              onOpenFamilyTracking={() => navigation.navigate("FamilyLiveTracking")}
+            />
+          )}
+        </Stack.Screen>
+        <Stack.Screen name="FamilyLiveTracking" component={FamilyLiveTrackingRouteScreen} />
         <Stack.Screen name="NearbyHelp" component={NearbyHelpScreen} />
         <Stack.Screen name="Assistant" component={AssistantScreen} />
         <Stack.Screen name="Report" component={ReportRouteScreen} />

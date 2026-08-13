@@ -34,23 +34,37 @@ class SOSModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
             return
         }
         try {
-            val smsManager = reactApplicationContext.getSystemService(SmsManager::class.java)
-                ?: SmsManager.getDefault()
-            var allSucceeded = true
+            var smsManager: SmsManager? = null
+            try {
+                smsManager = reactApplicationContext.getSystemService(SmsManager::class.java)
+            } catch (_: Exception) {
+            }
+            if (smsManager == null) {
+                @Suppress("DEPRECATION")
+                smsManager = SmsManager.getDefault()
+            }
+
+            var sentCount = 0
             for (i in 0 until numbers.size()) {
-                val number = numbers.getString(i) ?: continue
+                val rawNumber = numbers.getString(i)?.trim()
+                if (rawNumber.isNullOrBlank()) continue
                 try {
                     val parts = smsManager.divideMessage(message)
-                    if (parts.size > 1) {
-                        smsManager.sendMultipartTextMessage(number, null, parts, null, null)
+                    if (parts != null && parts.size > 1) {
+                        smsManager.sendMultipartTextMessage(rawNumber, null, parts, null, null)
                     } else {
-                        smsManager.sendTextMessage(number, null, message, null, null)
+                        smsManager.sendTextMessage(rawNumber, null, message, null, null)
                     }
+                    sentCount++
                 } catch (e: Exception) {
-                    allSucceeded = false
+                    android.util.Log.e("SOSModule", "Error sending SMS to $rawNumber: ${e.message}")
                 }
             }
-            promise.resolve(allSucceeded)
+            if (sentCount > 0) {
+                promise.resolve(true)
+            } else {
+                promise.reject("SMS_FAILED", "Could not send SMS to any recipient")
+            }
         } catch (e: Exception) {
             promise.reject("SMS_ERROR", e.message, e)
         }

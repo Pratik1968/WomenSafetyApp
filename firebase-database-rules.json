@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "tracking_sessions": {
+      "$sessionId": {
+        ".read": true,
+        ".write": "auth != null || !data.exists() || data.child('active').val() == true"
+      }
+    }
+  }
+}

@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from typing import List, Dict, Any
+import uuid
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.schemas.emergency import (
@@ -8,6 +10,7 @@ from app.schemas.emergency import (
     EmergencyContactResponse,
     SOSIncidentCreate,
     SOSIncidentResponse,
+    IncidentSyncPayload,
 )
 from app.services.notification.notification_service import NotificationService
 from app.repositories.emergency_contact_repository import EmergencyContactRepository
@@ -17,6 +20,10 @@ from app.db.session import get_db
 from app.core.logging import logger
 
 router = APIRouter(prefix="/emergency", tags=["Emergency Service & SOS"])
+
+# In-memory store for incident events (fallback when DB is unavailable)
+_incident_events: List[Dict[str, Any]] = []
+
 
 
 def _resolve_caller_user_id(current_uid: str) -> str:
@@ -123,3 +130,66 @@ async def trigger_sos_incident(
         latitude=payload.latitude,
         longitude=payload.longitude
     )
+
+
+# ── Incident Step Sync ────────────────────────────────────────────────────────
+
+@router.post("/incidents/sync", status_code=status.HTTP_200_OK)
+async def sync_incident_event(payload: IncidentSyncPayload):
+    """
+    Receive one SOS step event from the mobile app and persist it.
+    Called for every step (SOS_TRIGGERED, LOCATION_ACQUIRED, SMS_SENT, …).
+    No auth dependency — called during active emergencies where auth may be disrupted.
+    """
+    event_id = str(uuid.uuid4())
+    occurred_at_iso = datetime.fromtimestamp(payload.occurredAt / 1000, tz=timezone.utc).isoformat()
+    started_at_iso = datetime.fromtimestamp(payload.startedAt / 1000, tz=timezone.utc).isoformat()
+
+    logger.info(
+        f"[incidents/sync] step={payload.step} clientIncidentId={payload.clientIncidentId} "
+        f"uid={payload.firebaseUid} status={payload.status}"
+    )
+    logger.info(f"  location: {payload.location}")
+    logger.info(f"  stepData: {payload.stepData}")
+
+    event: Dict[str, Any] = {
+        "id": event_id,
+        "clientIncidentId": payload.clientIncidentId,
+        "firebaseUid": payload.firebaseUid,
+        "source": payload.source,
+        "status": payload.status,
+        "startedAt": started_at_iso,
+        "step": payload.step,
+        "stepData": payload.stepData,
+        "location": payload.location.model_dump() if payload.location else None,
+        "occurredAt": occurred_at_iso,
+    }
+    _incident_events.append(event)
+
+    return {"success": True, "data": {"incidentId": event_id, "step": payload.step}}
+
+
+@router.get("/incidents/history", status_code=status.HTTP_200_OK)
+async def get_incident_history(
+    firebaseUid: str = Query(..., description="Firebase UID of the requesting user"),
+):
+    """
+    Return summarised SOS history for a user (one entry per clientIncidentId,
+    carrying the status of the most-recent step).
+    """
+    events = [e for e in _incident_events if e.get("firebaseUid") == firebaseUid]
+
+    # Collapse to one entry per clientIncidentId — last write (latest step) wins
+    seen: Dict[str, Any] = {}
+    for ev in events:
+        cid = ev["clientIncidentId"]
+        seen[cid] = {
+            "id": ev["id"],
+            "clientIncidentId": cid,
+            "source": ev.get("source"),
+            "status": ev.get("status"),
+            "startedAt": ev.get("startedAt"),
+            "firebaseUid": ev.get("firebaseUid"),
+        }
+
+    return {"success": True, "data": list(seen.values())}

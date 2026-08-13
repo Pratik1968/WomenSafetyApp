@@ -31,6 +31,7 @@ import {
   type SOSTriggerSource,
 } from "../services/sosOrchestratorService";
 import { contactStorageService } from "../services/contactStorageService";
+import { locationService } from "../modules/location/services/locationService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -110,6 +111,28 @@ export function SosScreen({
 }) {
   // ── Location label ─────────────────────────────────────────
   const [mapLabel, setMapLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    locationService
+      .getCurrentLocation()
+      .then((loc) => {
+        if (loc?.address) {
+          const areaName =
+            loc.address.formattedAddress ||
+            [loc.address.street, loc.address.city, loc.address.region].filter(Boolean).join(", ");
+          if (areaName) {
+            setMapLabel(areaName);
+            return;
+          }
+        }
+        if (loc?.coordinates) {
+          setMapLabel(`${loc.coordinates.latitude.toFixed(5)}, ${loc.coordinates.longitude.toFixed(5)}`);
+        }
+      })
+      .catch(() => {
+        setMapLabel("GPS Location Active");
+      });
+  }, []);
 
   // ── Elapsed timer ──────────────────────────────────────────
   const [elapsedSecs, setElapsedSecs] = useState(0);
