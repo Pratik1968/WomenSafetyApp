@@ -24,4 +24,7 @@ yarn-error.*
 # deno.lock is committed; ignore local caches only
 .deno/
 
+# ---- IDE ----
+
+.idea/
 backend/credentials/firebase-service-account.json
