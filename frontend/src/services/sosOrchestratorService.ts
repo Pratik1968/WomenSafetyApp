@@ -29,6 +29,7 @@ import { contactStorageService } from "./contactStorageService";
 import { sendSilentSms, makeSilentCall } from "./sosNativeService";
 import { auth } from "./firebaseConfig";
 import { syncIncidentEvent } from "./incidentSyncService";
+import * as behaviorAnalysisService from "./behaviorAnalysisService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -312,6 +313,9 @@ export async function getIncidentById(id: string): Promise<SOSIncident | undefin
  * @returns The incidentId (use to track / cancel this incident)
  */
 export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
+  // Module 18: fresh incident, fresh behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Ensure native Android runtime permissions (SEND_SMS, CALL_PHONE, POST_NOTIFICATIONS)
   await ensureAndroidPermissions();
 
@@ -420,6 +424,20 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
           lat: loc.lat,
           lon: loc.lon,
         });
+
+        // Module 18: AI Behavior Analysis — best-effort, never blocks the
+        // location watcher. See behaviorAnalysisService.ts for the signal
+        // engine and docs/superpowers/specs/2026-08-13-module18-behavior-analysis-design.md
+        // for the design.
+        behaviorAnalysisService
+          .evaluate({ lat: loc.lat, lon: loc.lon, timestampMs: loc.timestamp })
+          .then((alert) => {
+            if (!alert) return;
+            return appendLog(incidentId, alert.eventType, { detail: alert.detail });
+          })
+          .catch(() => {
+            // Best-effort — a failed behavior check must never affect the SOS pipeline.
+          });
       }
     );
     await appendLog(incidentId, "LIVE_TRACKING_STARTED", {});
@@ -446,6 +464,9 @@ export async function cancelSOS(
   incidentId: string,
   status: "resolved" | "cancelled" = "resolved"
 ): Promise<void> {
+  // Module 18: incident is ending, clear the behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Stop live location tracking
   if (locationWatcher) {
     locationWatcher.remove();
