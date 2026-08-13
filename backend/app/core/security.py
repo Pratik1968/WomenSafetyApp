@@ -4,8 +4,9 @@ import hmac
 import base64
 import json
 import time
+from dataclasses import dataclass
 from typing import Optional
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from app.core.config import settings
 from app.core.firebase import HAS_FIREBASE, get_firebase_app
 from app.core.logging import logger
@@ -84,18 +85,27 @@ def _decode_jwt_payload_unverified(token: str) -> dict:
         raise ValueError(f"Failed to decode JWT payload: {exc}") from exc
 
 
-def _extract_uid_from_unverified_token(token: str) -> str:
+def _extract_identity_from_unverified_token(token: str) -> "FirebaseIdentity":
     payload = _decode_jwt_payload_unverified(token)
     uid = payload.get("uid") or payload.get("user_id") or payload.get("sub")
     if not uid:
         raise ValueError("No uid/user_id/sub field found in token payload")
-    return uid
+    return FirebaseIdentity(uid=uid, phone_number=payload.get("phone_number"))
 
 
-async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) -> str:
+@dataclass
+class FirebaseIdentity:
+    """The verified caller identity extracted from a Firebase ID token or app session token."""
+    uid: str
+    # Only populated for real Firebase ID tokens (phone-auth claim); app session
+    # tokens carry no phone number, so callers must treat this as optional.
+    phone_number: Optional[str] = None
+
+
+async def get_current_firebase_identity(authorization: Optional[str] = Header(None)) -> FirebaseIdentity:
     """
     Verifies the Firebase ID token from the `Authorization: Bearer <token>` header
-    and returns the caller's real Firebase UID.
+    and returns the caller's real Firebase UID plus phone number (when available).
 
     In production, the Firebase Admin SDK performs full cryptographic verification.
     In dev/CI mode (no service-account credentials), the JWT payload is decoded
@@ -110,7 +120,7 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
 
     if token.startswith(APP_SESSION_PREFIX):
         try:
-            return _extract_uid_from_app_session_token(token)
+            return FirebaseIdentity(uid=_extract_uid_from_app_session_token(token))
         except Exception as exc:
             logger.warning(f"App session token verification failed: {exc}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token") from exc
@@ -121,7 +131,7 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
         # --- PRODUCTION PATH: full cryptographic verification ---
         try:
             decoded = firebase_auth.verify_id_token(token)
-            return decoded["uid"]
+            return FirebaseIdentity(uid=decoded["uid"], phone_number=decoded.get("phone_number"))
         except Exception as err:
             logger.warning(f"Firebase ID token verification failed: {err}")
             if settings.DEBUG:
@@ -131,9 +141,9 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
                     "(see frontend/google-services.json project_id)."
                 )
                 try:
-                    uid = _extract_uid_from_unverified_token(token)
-                    logger.info(f"Dev-mode fallback: extracted firebase UID '{uid}' from unverified JWT")
-                    return uid
+                    identity = _extract_identity_from_unverified_token(token)
+                    logger.info(f"Dev-mode fallback: extracted firebase UID '{identity.uid}' from unverified JWT")
+                    return identity
                 except Exception as exc:
                     logger.error(f"Dev-mode JWT decode fallback failed: {exc}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
@@ -144,12 +154,17 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
             "(DEV MODE ONLY, not safe for production)"
         )
         try:
-            uid = _extract_uid_from_unverified_token(token)
-            logger.info(f"Dev-mode: extracted firebase UID '{uid}' from unverified JWT")
-            return uid
+            identity = _extract_identity_from_unverified_token(token)
+            logger.info(f"Dev-mode: extracted firebase UID '{identity.uid}' from unverified JWT")
+            return identity
         except Exception as exc:
             logger.error(f"Dev-mode JWT decode failed: {exc}")
             raise HTTPException(status_code=401, detail="Could not extract UID from token (dev mode)")
+
+
+async def get_current_firebase_uid(identity: FirebaseIdentity = Depends(get_current_firebase_identity)) -> str:
+    """Back-compat dependency for routes that only need the UID."""
+    return identity.uid
 
 
 def hash_password(password: str) -> str:
