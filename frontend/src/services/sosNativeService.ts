@@ -36,8 +36,8 @@ const { SOSModule, ShakeModule } = NativeModules as {
   };
 };
 
-const isNativeAvailable = Platform.OS === "android" && !!SOSModule;
-const isShakeAvailable = Platform.OS === "android" && !!ShakeModule;
+const isNativeAvailable = () => Platform.OS === "android" && !!NativeModules.SOSModule;
+const isShakeAvailable = () => Platform.OS === "android" && !!NativeModules.ShakeModule;
 
 function warnFallback(method: string): void {
   console.warn(
@@ -59,12 +59,12 @@ export async function sendSilentSms(
   phoneNumbers: string[],
   message: string
 ): Promise<boolean> {
-  if (!isNativeAvailable || !SOSModule) {
+  if (!isNativeAvailable() || !NativeModules.SOSModule) {
     warnFallback("sendSilentSms");
     return false;
   }
   try {
-    return await SOSModule.sendSilentSms(phoneNumbers, message);
+    return await NativeModules.SOSModule.sendSilentSms(phoneNumbers, message);
   } catch (err) {
     console.error("[sosNativeService] sendSilentSms failed:", err);
     return false;
@@ -81,12 +81,12 @@ export async function sendSilentSms(
  * On iOS / Expo Go: logs a warning and resolves false.
  */
 export async function makeSilentCall(phoneNumber: string): Promise<boolean> {
-  if (!isNativeAvailable || !SOSModule) {
+  if (!isNativeAvailable() || !NativeModules.SOSModule) {
     warnFallback("makeSilentCall");
     return false;
   }
   try {
-    return await SOSModule.makeSilentCall(phoneNumber);
+    return await NativeModules.SOSModule.makeSilentCall(phoneNumber);
   } catch (err) {
     console.error("[sosNativeService] makeSilentCall failed:", err);
     return false;
@@ -102,12 +102,12 @@ export async function makeSilentCall(phoneNumber: string): Promise<boolean> {
  * Safe to call multiple times. No-op on iOS / Expo Go.
  */
 export async function startShakeDetection(): Promise<boolean> {
-  if (!isShakeAvailable || !ShakeModule) {
+  if (!isShakeAvailable() || !NativeModules.ShakeModule) {
     warnFallback("startShakeDetection");
     return false;
   }
   try {
-    return await ShakeModule.startShakeDetection();
+    return await NativeModules.ShakeModule.startShakeDetection();
   } catch (err) {
     console.error("[sosNativeService] startShakeDetection failed:", err);
     return false;
@@ -119,12 +119,12 @@ export async function startShakeDetection(): Promise<boolean> {
  * No-op on iOS / Expo Go.
  */
 export async function stopShakeDetection(): Promise<boolean> {
-  if (!isShakeAvailable || !ShakeModule) {
+  if (!isShakeAvailable() || !NativeModules.ShakeModule) {
     warnFallback("stopShakeDetection");
     return false;
   }
   try {
-    return await ShakeModule.stopShakeDetection();
+    return await NativeModules.ShakeModule.stopShakeDetection();
   } catch (err) {
     console.error("[sosNativeService] stopShakeDetection failed:", err);
     return false;
