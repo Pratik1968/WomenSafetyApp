@@ -127,8 +127,7 @@ export function IncomingCallScreen() {
   };
 
   const getAvatarIcon = () => {
-    if (config?.callerName === "Dad ❤️") return UserCheck;
-    return Heart;
+    return UserCheck;
   };
 
   const AvatarIcon = getAvatarIcon();

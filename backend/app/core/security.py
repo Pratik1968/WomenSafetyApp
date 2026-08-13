@@ -4,8 +4,9 @@ import hmac
 import base64
 import json
 import time
+from dataclasses import dataclass
 from typing import Optional
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from app.core.config import settings
 from app.core.firebase import HAS_FIREBASE, get_firebase_app
 from app.core.logging import logger
@@ -65,18 +66,11 @@ def _extract_uid_from_app_session_token(token: str) -> str:
 
 
 def _decode_jwt_payload_unverified(token: str) -> dict:
-    """
-    Decode a Firebase JWT payload WITHOUT cryptographic signature verification.
-    Used ONLY when the Firebase Admin SDK / service-account credentials are
-    unavailable (local dev / CI environment). Never use in production.
-    """
     try:
-        # JWT format:  header.payload.signature  (all base64url-encoded)
         parts = token.split(".")
         if len(parts) != 3:
             raise ValueError("Not a valid JWT (expected 3 parts)")
         payload_b64 = parts[1]
-        # Add padding so Python's base64 decoder is happy
         payload_b64 += "=" * (-len(payload_b64) % 4)
         payload_json = base64.urlsafe_b64decode(payload_b64).decode("utf-8")
         return json.loads(payload_json)
@@ -84,23 +78,22 @@ def _decode_jwt_payload_unverified(token: str) -> dict:
         raise ValueError(f"Failed to decode JWT payload: {exc}") from exc
 
 
-def _extract_uid_from_unverified_token(token: str) -> str:
+def _extract_identity_from_unverified_token(token: str) -> "FirebaseIdentity":
     payload = _decode_jwt_payload_unverified(token)
     uid = payload.get("uid") or payload.get("user_id") or payload.get("sub")
     if not uid:
         raise ValueError("No uid/user_id/sub field found in token payload")
-    return uid
+    return FirebaseIdentity(uid=uid, phone_number=payload.get("phone_number"))
 
 
-async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) -> str:
-    """
-    Verifies the Firebase ID token from the `Authorization: Bearer <token>` header
-    and returns the caller's real Firebase UID.
+@dataclass
+class FirebaseIdentity:
+    """The verified caller identity extracted from a Firebase ID token or app session token."""
+    uid: str
+    phone_number: Optional[str] = None
 
-    In production, the Firebase Admin SDK performs full cryptographic verification.
-    In dev/CI mode (no service-account credentials), the JWT payload is decoded
-    without signature verification so that local development works end-to-end.
-    """
+
+async def get_current_firebase_identity(authorization: Optional[str] = Header(None)) -> FirebaseIdentity:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or malformed Authorization header")
 
@@ -110,7 +103,7 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
 
     if token.startswith(APP_SESSION_PREFIX):
         try:
-            return _extract_uid_from_app_session_token(token)
+            return FirebaseIdentity(uid=_extract_uid_from_app_session_token(token))
         except Exception as exc:
             logger.warning(f"App session token verification failed: {exc}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token") from exc
@@ -118,40 +111,33 @@ async def get_current_firebase_uid(authorization: Optional[str] = Header(None)) 
     firebase_app = get_firebase_app() if (HAS_FIREBASE and firebase_auth) else None
 
     if firebase_app:
-        # --- PRODUCTION PATH: full cryptographic verification ---
         try:
             decoded = firebase_auth.verify_id_token(token)
-            return decoded["uid"]
+            return FirebaseIdentity(uid=decoded["uid"], phone_number=decoded.get("phone_number"))
         except Exception as err:
             logger.warning(f"Firebase ID token verification failed: {err}")
             if settings.DEBUG:
-                logger.warning(
-                    "DEBUG mode: falling back to unverified JWT decode. "
-                    "Ensure the backend service-account JSON matches the mobile app's Firebase project "
-                    "(see frontend/google-services.json project_id)."
-                )
                 try:
-                    uid = _extract_uid_from_unverified_token(token)
-                    logger.info(f"Dev-mode fallback: extracted firebase UID '{uid}' from unverified JWT")
-                    return uid
+                    identity = _extract_identity_from_unverified_token(token)
+                    logger.info(f"Dev-mode fallback: extracted firebase UID '{identity.uid}' from unverified JWT")
+                    return identity
                 except Exception as exc:
                     logger.error(f"Dev-mode JWT decode fallback failed: {exc}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
     else:
-        # --- DEV / CI PATH: signature NOT verified, payload decoded only ---
-        logger.warning(
-            "Firebase Admin SDK unavailable - decoding JWT without signature verification "
-            "(DEV MODE ONLY, not safe for production)"
-        )
+        logger.warning("Firebase Admin SDK unavailable - decoding JWT without signature verification (DEV MODE)")
         try:
-            uid = _extract_uid_from_unverified_token(token)
-            logger.info(f"Dev-mode: extracted firebase UID '{uid}' from unverified JWT")
-            return uid
+            identity = _extract_identity_from_unverified_token(token)
+            logger.info(f"Dev-mode: extracted firebase UID '{identity.uid}' from unverified JWT")
+            return identity
         except Exception as exc:
             logger.error(f"Dev-mode JWT decode failed: {exc}")
             raise HTTPException(status_code=401, detail="Could not extract UID from token (dev mode)")
 
 
+async def get_current_firebase_uid(identity: FirebaseIdentity = Depends(get_current_firebase_identity)) -> str:
+    """Back-compat dependency for routes that only need the UID."""
+    return identity.uid
 def hash_password(password: str) -> str:
     """Hash a password using PBKDF2 with SHA-256 and a random 16-byte salt."""
     salt = os.urandom(16)

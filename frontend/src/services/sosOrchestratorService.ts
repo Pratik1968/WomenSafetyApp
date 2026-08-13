@@ -29,6 +29,10 @@ import { contactStorageService } from "./contactStorageService";
 import { sendSilentSms, makeSilentCall } from "./sosNativeService";
 import { auth } from "./firebaseConfig";
 import { syncIncidentEvent } from "./incidentSyncService";
+import { API_BASE_URL } from "../api/config";
+import { getPublicTrackingUrl } from "../utils/trackingUrl";
+import { startLiveLocationSharing, stopLiveLocationSharing } from "./liveLocationSharing";
+import * as behaviorAnalysisService from "./behaviorAnalysisService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -114,23 +118,38 @@ async function cacheLocation(loc: SOSLocation): Promise<void> {
  */
 async function acquireLocation(): Promise<SOSLocation | null> {
   try {
-    const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Highest,
-    });
-    const loc: SOSLocation = {
-      lat: pos.coords.latitude,
-      lon: pos.coords.longitude,
-      timestamp: pos.timestamp,
-      accurate: true,
-    };
-    await cacheLocation(loc);
-    return loc;
-  } catch {
-    // GPS unavailable — use last known location as fallback
-    const cached = await getCachedLocation();
-    if (cached) return { ...cached, accurate: false };
-    return null;
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === "granted") {
+      // Attempt fast position retrieval via last known position first
+      let pos: Location.LocationObject | null = null;
+      if (typeof Location.getLastKnownPositionAsync === "function") {
+        pos = await Location.getLastKnownPositionAsync({});
+      }
+      if (!pos && typeof Location.getCurrentPositionAsync === "function") {
+        pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+      }
+
+      if (pos) {
+        const loc: SOSLocation = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          timestamp: pos.timestamp,
+          accurate: true,
+        };
+        await cacheLocation(loc);
+        return loc;
+      }
+    }
+  } catch (err) {
+    console.warn("[sosOrchestrator] Error acquiring GPS position:", err);
   }
+
+  // GPS unavailable — use last known location as fallback
+  const cached = await getCachedLocation();
+  if (cached) return { ...cached, accurate: false };
+  return null;
 }
 
 /**
@@ -171,15 +190,6 @@ async function patchIncident(
   return incidents[idx];
 }
 
-/**
- * Fire-and-forget backend sync for one pipeline step. Callers MUST NOT
- * `await` this — on poor connectivity the API client's timeout/retry
- * behavior can take 10s+ per call, and this must never delay the
- * actual SMS-sending / call-placing steps in the pipeline (see file
- * header). Never throws internally either way — a failed sync must not
- * block or fail the SOS pipeline. Skips silently if no user is signed in
- * (nothing to attribute the incident to).
- */
 async function syncStepToBackend(inc: SOSIncident, step: string, data?: Record<string, unknown>): Promise<void> {
   const firebaseUid = auth.currentUser?.uid;
   if (!firebaseUid) return;
@@ -215,8 +225,6 @@ async function appendLog(
     ],
   }));
   if (updated) {
-    // Fire-and-forget: do not await — a slow/hanging network call must
-    // never delay the SOS pipeline (see syncStepToBackend's doc comment).
     void syncStepToBackend(updated, step, data);
   }
 }
@@ -225,6 +233,8 @@ async function ensureAndroidPermissions(): Promise<void> {
   if (Platform.OS !== "android") return;
   try {
     const permissions = [
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
       PermissionsAndroid.PERMISSIONS.SEND_SMS,
       PermissionsAndroid.PERMISSIONS.CALL_PHONE,
     ];
@@ -312,6 +322,9 @@ export async function getIncidentById(id: string): Promise<SOSIncident | undefin
  * @returns The incidentId (use to track / cancel this incident)
  */
 export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
+  // Module 18: fresh incident, fresh behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Ensure native Android runtime permissions (SEND_SMS, CALL_PHONE, POST_NOTIFICATIONS)
   await ensureAndroidPermissions();
 
@@ -334,8 +347,6 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   const incidents = await readIncidents();
   incidents.unshift(incident);
   await writeIncidents(incidents);
-  // Fire-and-forget: do not await — a slow/hanging network call must
-  // never delay the SOS pipeline (see syncStepToBackend's doc comment).
   void syncStepToBackend(incident, "SOS_TRIGGERED", { source });
 
   // ── Step 2: Get location (with fallback) ────────────────────
@@ -355,19 +366,24 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     .map((c) => (c.phone ?? "").replace(/\s+/g, ""))
     .filter(Boolean);
 
-  // ── Step 4: Build SOS message ──────────────────────────────
+  // ── Step 4: Build SOS message with live location links ─────
   const mapsLink = location
     ? `https://maps.google.com/?q=${location.lat},${location.lon}`
-    : "Location unavailable";
+    : "Location acquiring...";
+  const trackingLink = getPublicTrackingUrl(incidentId);
   const timeStr = new Date().toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
+  
   const message =
-    `🚨 SOS ALERT from Aegis Safety App\n` +
+    `🚨 SOS EMERGENCY ALERT from Aegis Safety App\n` +
     `I need immediate help! (${timeStr})\n` +
-    `My location: ${mapsLink}\n` +
-    `Please call me or come to my location.`;
+    `Live Map: ${mapsLink}\n` +
+    `Live Stream: ${trackingLink}\n` +
+    `Coords: ${location ? `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}` : "Acquiring..."}\n` +
+    `Please call me or dispatch emergency services immediately.`;
 
   // ── Step 5: Send silent SMS to all contacts ─────────────────
   if (phones.length > 0) {
@@ -375,6 +391,7 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
     await appendLog(incidentId, "SMS_SENT", {
       numbers: phones,
       success: smsSent,
+      message,
     });
     await patchIncident(incidentId, (inc) => ({
       ...inc,
@@ -399,7 +416,10 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   await setupNotificationChannel();
   await showSOSActiveNotification(incidentId);
 
-  // ── Step 8: Start live location watch ──────────────────────
+  // ── Step 8: Start 4.5s live location watch & live SMS updates ───
+  let lastSmsTimestamp = Date.now();
+  void startLiveLocationSharing(incidentId);
+
   try {
     locationWatcher = await Location.watchPositionAsync(
       {
@@ -420,6 +440,35 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
           lat: loc.lat,
           lon: loc.lon,
         });
+
+        // Send silent SMS live location updates every ~30 seconds while SOS is ON
+        const now = Date.now();
+        if (phones.length > 0 && now - lastSmsTimestamp >= 30_000) {
+          lastSmsTimestamp = now;
+          const liveTime = new Date().toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const liveMsg =
+            `🚨 SOS LIVE LOCATION UPDATE (${liveTime})\n` +
+            `Current Position: https://maps.google.com/?q=${loc.lat},${loc.lon}\n` +
+            `Live Stream: ${trackingLink}`;
+          
+          await sendSilentSms(phones, liveMsg);
+          await appendLog(incidentId, "LIVE_LOCATION_SMS_SENT", {
+            lat: loc.lat,
+            lon: loc.lon,
+          });
+        }
+
+        // Module 18: AI Behavior Analysis — best-effort, never blocks the location watcher
+        behaviorAnalysisService
+          .evaluate({ lat: loc.lat, lon: loc.lon, timestampMs: loc.timestamp })
+          .then((alert) => {
+            if (!alert) return;
+            return appendLog(incidentId, alert.eventType, { detail: alert.detail });
+          })
+          .catch(() => {});
       }
     );
     await appendLog(incidentId, "LIVE_TRACKING_STARTED", {});
@@ -446,6 +495,11 @@ export async function cancelSOS(
   incidentId: string,
   status: "resolved" | "cancelled" = "resolved"
 ): Promise<void> {
+  // Stop 4.5s live location sharing stream
+  void stopLiveLocationSharing(incidentId);
+  // Module 18: incident is ending, clear the behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Stop live location tracking
   if (locationWatcher) {
     locationWatcher.remove();

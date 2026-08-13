@@ -13,10 +13,15 @@ jest.mock("./sosNativeService", () => ({
 jest.mock("./firebaseConfig", () => ({
   auth: { currentUser: { uid: "uid-test-1" } },
 }));
+jest.mock("./behaviorAnalysisService", () => ({
+  evaluate: jest.fn().mockResolvedValue(null),
+  reset: jest.fn(),
+}));
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { syncIncidentEvent } from "./incidentSyncService";
 import { triggerSOS, cancelSOS, getIncidentById } from "./sosOrchestratorService";
+import * as behaviorAnalysisService from "./behaviorAnalysisService";
 
 const mockedSync = syncIncidentEvent as jest.Mock;
 
@@ -99,5 +104,32 @@ describe("sosOrchestratorService backend sync", () => {
     // generous ceiling — if triggerSOS were awaiting the hanging sync call,
     // this would blow past Jest's default 5s test timeout instead.
     expect(elapsed).toBeLessThan(5000);
+  });
+});
+
+describe("sosOrchestratorService — Module 18 AI behavior analysis integration", () => {
+  const mockedEvaluate = behaviorAnalysisService.evaluate as jest.Mock;
+  const mockedReset = behaviorAnalysisService.reset as jest.Mock;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    mockedSync.mockClear();
+    mockedSync.mockResolvedValue(undefined);
+    mockedEvaluate.mockClear();
+    mockedEvaluate.mockResolvedValue(null);
+    mockedReset.mockClear();
+  });
+
+  it("resets the behavior-analysis buffer when a new SOS incident starts", async () => {
+    await triggerSOS("BUTTON");
+    expect(mockedReset).toHaveBeenCalled();
+  });
+
+  it("resets the behavior-analysis buffer when an SOS incident ends", async () => {
+    const incidentId = await triggerSOS("BUTTON");
+    mockedReset.mockClear();
+
+    await cancelSOS(incidentId, "resolved");
+    expect(mockedReset).toHaveBeenCalled();
   });
 });
