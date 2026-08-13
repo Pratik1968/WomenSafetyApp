@@ -4,6 +4,7 @@ import { NavigationContainer, useNavigationContainerRef } from "@react-navigatio
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
+import { useShakeDetector } from "../hooks/useShakeDetector";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { PhoneScreen } from "../screens/PhoneScreen";
 import { OtpScreen } from "../screens/OtpScreen";
@@ -493,6 +494,12 @@ function WebAdminApp() {
 
 function MobileApp() {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+  useShakeDetector(() => {
+    if (navigationRef.isReady()) {
+      navigationRef.navigate("Sos", { state: "active" });
+    }
+  });
 
   useEffect(() => {
     const subscription = addEmergencyActionListener((action: string) => {
