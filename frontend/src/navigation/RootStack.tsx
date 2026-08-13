@@ -49,6 +49,7 @@ import { contactStorageService } from "../services/contactStorageService";
 import { API_BASE_URL } from "../api/config";
 import { getAuthHeader, setPhoneConfirmation, getPhoneConfirmation } from "../services/firebaseConfig";
 import { addEmergencyActionListener } from "../modules/EmergencyModule";
+import { FaceVerificationScreen,FaceRegistrationScreen,} from "../modules/face";
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -84,6 +85,8 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminIncidents: undefined;
+  FaceVerification: undefined;
+  FaceRegistration: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -314,6 +317,8 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Report Area") navigation.navigate("Report");
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
+        else if (action === "Register Face") navigation.navigate("FaceRegistration");
+
       }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
@@ -404,8 +409,29 @@ function SosRouteScreen({ navigation, route }: P<"Sos">) {
     <SosScreen
       state={sosState}
       onEnd={() => navigation.setParams({ state: "confirm" })}
-      onCancelConfirm={() => navigation.setParams({ state: "cancelled" })}
+      onCancelConfirm={() => navigation.navigate("FaceVerification")}
       onDone={() => navigation.replace("Home")}
+    />
+  );
+}
+
+function FaceVerificationRouteScreen({
+  navigation,
+}: P<"FaceVerification">) {
+  return (
+    <FaceVerificationScreen
+      onVerified={() => navigation.replace("Home")}
+      onFailed={() => navigation.goBack()}
+    />
+  );
+}
+
+function FaceRegistrationRouteScreen({
+  navigation,
+}: P<"FaceRegistration">) {
+  return (
+    <FaceRegistrationScreen
+      onDone={() => navigation.goBack()}
     />
   );
 }
@@ -529,6 +555,8 @@ function MobileApp() {
         <Stack.Screen name="History" component={HistoryRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Profile" component={ProfileRouteScreen} options={{ animation: "none" }} />
         <Stack.Screen name="Sos" component={SosRouteScreen} />
+        <Stack.Screen name="FaceVerification" component={FaceVerificationRouteScreen} />
+        <Stack.Screen name="FaceRegistration" component={FaceRegistrationRouteScreen} />
         <Stack.Screen name="SafeRoute" component={SafeRouteScreen} />
         <Stack.Screen name="NearbyHelp" component={NearbyHelpScreen} />
         <Stack.Screen name="Assistant" component={AssistantScreen} />

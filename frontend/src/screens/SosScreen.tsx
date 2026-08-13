@@ -312,7 +312,7 @@ export function SosScreen({
         actions={
           <View style={styles.dialogActions}>
             <AppButton variant="destructive" onPress={onCancelConfirm}>
-              Yes, I'm safe now
+              Verify a trusted face
             </AppButton>
             <AppButton variant="ghost" size="md" onPress={onDone}>
               Keep it running
