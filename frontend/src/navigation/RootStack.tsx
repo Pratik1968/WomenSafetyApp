@@ -1,6 +1,9 @@
+import { FakeCallScreen } from "../screens/FakeCallScreen";
+import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+import * as Linking from "expo-linking";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
@@ -62,6 +65,8 @@ export type RootStackParamList = {
   Setup: undefined;
   Permissions: undefined;
   Home: undefined;
+  FakeCall: undefined;
+  IncomingCall: undefined;
   Safety: undefined;
   SafetyMode: undefined;
   History: undefined;
@@ -93,6 +98,14 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 type P<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
+
+function FakeCallRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "FakeCall">) {
+  return <FakeCallScreen onBack={() => navigation.goBack()} />;
+}
+
+function IncomingCallRouteScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "IncomingCall">) {
+  return <IncomingCallScreen />;
+}
 
 function SplashRouteScreen({ navigation }: P<"Splash">) {
   useEffect(() => {
@@ -322,6 +335,10 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Register Face") navigation.navigate("FaceRegistration");
 
         else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
+        else if (action === "Fake Call") navigation.navigate("IncomingCall");
+      }}
+      onQuickActionLongPress={(action: string) => {
+        if (action === "Fake Call") navigation.navigate("FakeCall");
       }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
@@ -541,8 +558,17 @@ function MobileApp() {
     return () => subscription.remove();
   }, [navigationRef]);
 
+  const linking = {
+    prefixes: [Linking.createURL("/"), "aegis://", "aegiswomensafety://"],
+    config: {
+      screens: {
+        IncomingCall: "fakecall",
+      },
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashRouteScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingRouteScreen} />
@@ -580,6 +606,8 @@ function MobileApp() {
         <Stack.Screen name="AdminIncidents" component={AdminIncidentsRouteScreen} />
         <Stack.Screen name="VoiceTriggerConfig" component={VoiceTriggerConfigScreen} />
         <Stack.Screen name="VoiceTraining" component={VoiceTrainingScreen} />
+        <Stack.Screen name="FakeCall" component={FakeCallRouteScreen} />
+        <Stack.Screen name="IncomingCall" component={IncomingCallRouteScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

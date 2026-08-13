@@ -56,6 +56,7 @@ const QUICK_ACTIONS = [
   { label: "AI Assistant", icon: Sparkles },
   { label: "Report Area", icon: Flag },
   { label: "Contacts", icon: Users },
+  { label: "Fake Call", icon: PhoneCall },
   { label: "Register Face", icon: UserRoundPlus },
 ];
 
