@@ -3,11 +3,13 @@
  * Suppresses debug & info console logs automatically when in production mode (`IS_PRODUCTION === true`).
  */
 
+import { envConfig } from '../config/env.config';
+
 export class LoggerService {
   private isProduction: boolean;
 
   constructor() {
-    this.isProduction = process.env.NODE_ENV === 'production';
+    this.isProduction = envConfig.IS_PRODUCTION;
   }
 
   public info(message: string, ...meta: any[]): void {

@@ -8,7 +8,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { EmergencySource, EmergencyPayload, EmergencyResponse, emergencyService } from '../services/emergencyService';
-import { firebaseAuthService } from '../infrastructure/auth/firebaseAuthService';
 import { logger } from '../utils/logger';
 
 interface EmergencyContextType {
@@ -44,23 +43,20 @@ export const EmergencyProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     logger.info('Initializing EmergencyContext — subscribing to emergencyService events...');
     const unsubscribe = emergencyService.onEmergencyEvent((last, history) => {
+      if (last) {
+        logger.warn(`[EmergencyContext] Emergency triggered: ID=${last.emergencyId}, source=${last.source}`);
+      }
       setLastEmergency(last);
       setEmergencyHistory(history);
     });
     return () => unsubscribe();
   }, []);
 
-  // NOTE: Voice keyword detection during a Safety Mode journey is handled
-  // exclusively by JourneyContext → journeyService.evaluateTranscript().
-  // EmergencyContext does NOT listen to VoiceContext transcripts.
-
   const triggerEmergency = async (
     source: EmergencySource,
     payload: Partial<EmergencyPayload>
   ): Promise<EmergencyResponse> => {
-    logger.info('EmergencyContext triggerEmergency called:', source);
-    // userId must be supplied by the caller (from firebaseAuthService.getCurrentUserId())
-    // EmergencyService will warn if missing
+    logger.warn(`[EmergencyContext] Emergency triggered: source=${source}`);
     return emergencyService.triggerEmergency(source, payload);
   };
 

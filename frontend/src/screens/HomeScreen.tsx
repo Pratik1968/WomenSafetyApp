@@ -55,7 +55,7 @@ const QUICK_ACTIONS = [
 ];
 
 const RECENT_ACTIVITY = [
-  { id: "1", kind: "journey", title: "Safe walk completed", detail: "Indiranagar to Koramangala · 18 min", time: "22m ago" },
+  { id: "1", kind: "journey", title: "Safe walk completed", detail: "Indiranagar to Koramangala • 18 min", time: "22m ago" },
   { id: "2", kind: "sos", title: "Test SOS pulse", detail: "All 3 emergency contacts responded", time: "2h ago" },
   { id: "3", kind: "report", title: "Area safety update", detail: "Street lighting issue reported in Sector 4", time: "1d ago" },
 ];
@@ -207,10 +207,10 @@ export function HomeScreen({
 
   const status =
     state === "monitoring"
-      ? { tone: "brand", title: "Safety Mode is on", sub: "Office → Home · arriving 9:36 PM" }
+      ? { tone: "brand", title: "Safety Mode is on", sub: "Office — Home • arriving 9:36 PM" }
       : state === "caution"
       ? { tone: "warning", title: "Extra care tonight", sub: "3 recent reports within 500 m" }
-      : { tone: "success", title: "You're in a safe area", sub: "Indiranagar · updated just now" };
+      : { tone: "success", title: "You're in a safe area", sub: "Indiranagar • updated just now" };
 
   return (
     <View style={styles.screen}>
@@ -288,7 +288,7 @@ export function HomeScreen({
             </Text>
             <Text style={styles.safetyModeSub}>
               {state === "monitoring"
-                ? "2 contacts watching · tap to view"
+                ? "2 contacts watching • tap to view"
                 : "We watch over your journey until you arrive"}
             </Text>
           </View>
