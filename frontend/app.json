@@ -58,6 +58,7 @@
     "plugins": [
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
+      "./plugins/withSafetyFeatures",
       [
         "expo-contacts",
         {

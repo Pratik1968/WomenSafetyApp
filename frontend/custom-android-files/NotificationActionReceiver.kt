@@ -1,4 +1,4 @@
-package com.womensafty.app
+package com.nameisrk.aegiswomensafety
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,8 +9,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val TAG = "NotificationActionReceiver"
-        const val ACTION_TRIGGER_SOS = "com.womensafty.app.action.NOTIFICATION_TRIGGER_SOS"
-        const val ACTION_END_JOURNEY = "com.womensafty.app.action.NOTIFICATION_END_JOURNEY"
+        const val ACTION_TRIGGER_SOS = "com.nameisrk.aegiswomensafety.action.NOTIFICATION_TRIGGER_SOS"
+        const val ACTION_END_JOURNEY = "com.nameisrk.aegiswomensafety.action.NOTIFICATION_END_JOURNEY"
     }
 
     override fun onReceive(context: Context, intent: Intent) {

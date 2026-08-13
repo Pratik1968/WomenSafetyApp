@@ -121,7 +121,9 @@ const withSafetyAndroidFiles = (config) => {
         'EmergencyModule.kt',
         'EmergencyPackage.kt',
         'NotificationActionReceiver.kt',
+        'SafetyForegroundModule.kt',
         'SafetyForegroundService.kt',
+        'SafetyPackage.kt',
         'SafetyTileService.kt',
         'SOSModule.kt',
         'ShakeModule.kt'

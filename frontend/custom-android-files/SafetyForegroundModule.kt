@@ -1,4 +1,4 @@
-package com.womensafty.app
+package com.nameisrk.aegiswomensafety
 
 import android.content.Intent
 import android.os.Build

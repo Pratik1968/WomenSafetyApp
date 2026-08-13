@@ -1,4 +1,4 @@
-package com.womensafty.app
+package com.nameisrk.aegiswomensafety
 
 import android.Manifest
 import android.app.Notification
@@ -50,9 +50,9 @@ class SafetyForegroundService : Service() {
         const val CHANNEL_SILENT_ID = "womensafty_silent_channel_v4"
         const val CHANNEL_SILENT_NAME = "WomenSafty Safety Monitoring (Silent)"
 
-        const val ACTION_START = "com.womensafty.app.action.START_SAFETY_SERVICE"
-        const val ACTION_STOP = "com.womensafty.app.action.STOP_SAFETY_SERVICE"
-        const val ACTION_UPDATE_LANGUAGE = "com.womensafty.app.action.UPDATE_LANGUAGE"
+        const val ACTION_START = "com.nameisrk.aegiswomensafety.action.START_SAFETY_SERVICE"
+        const val ACTION_STOP = "com.nameisrk.aegiswomensafety.action.STOP_SAFETY_SERVICE"
+        const val ACTION_UPDATE_LANGUAGE = "com.nameisrk.aegiswomensafety.action.UPDATE_LANGUAGE"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MESSAGE = "extra_message"
         const val EXTRA_LANGUAGE = "extra_language"
