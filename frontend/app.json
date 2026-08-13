@@ -2,15 +2,11 @@
   "expo": {
     "name": "Aegis",
     "slug": "aegis-women-safety",
+    "scheme": "aegis",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/splash-icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#090A0F"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nameisrk.aegiswomensafety",
@@ -25,8 +21,8 @@
     "android": {
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "backgroundColor": "#090A0F",
-        "foregroundImage": "./assets/splash-icon.png"
+        "foregroundImage": "./assets/splash-icon.png",
+        "backgroundColor": "#090A0F"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nameisrk.aegiswomensafety",
@@ -56,8 +52,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#090A0F"
+        }
+      ],
       [
         "expo-contacts",
         {
@@ -92,7 +94,10 @@
         {
           "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "./plugins/withFakeCallTile.js"
     ]
   }
 }
