@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegis_backend_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - FIREBASE_PROJECT_ID=women-safety-3d446
+      - FIREBASE_SERVICE_ACCOUNT_PATH=credentials/firebase-service-account.json
+      - DATABASE_URL=sqlite:///./women_safety.db
+    volumes:
+      - .:/app
+
+  # Nginx API Gateway (Front-facing Reverse Proxy)
+  api-gateway:
+    image: nginx:alpine
+    container_name: aegis-api-gateway
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - notification-service
+    networks:
+      - aegis-network
+
+  # Notification Microservice (FastAPI)
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: aegis-notification-service
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    networks:
+      - aegis-network
+
+networks:
+  aegis-network:
+    driver: bridge
+
