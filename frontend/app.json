@@ -2,6 +2,7 @@
   "expo": {
     "name": "Aegis",
     "slug": "aegis-women-safety",
+    "scheme": "aegis",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/splash-icon.png",
@@ -95,7 +96,8 @@
         {
           "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
-      ]
+      ],
+      "./plugins/withFakeCallTile.js"
     ]
   }
 }

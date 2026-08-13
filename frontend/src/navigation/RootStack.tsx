@@ -3,6 +3,7 @@ import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+import * as Linking from "expo-linking";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
@@ -327,6 +328,10 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Report Area") navigation.navigate("Report");
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
+        else if (action === "Fake Call") navigation.navigate("IncomingCall");
+      }}
+      onQuickActionLongPress={(action: string) => {
+        if (action === "Fake Call") navigation.navigate("FakeCall");
       }}
       onTab={(t: TabKey) => {
         if (t === "safety") navigation.navigate("Safety");
@@ -519,8 +524,17 @@ function MobileApp() {
     return () => subscription.remove();
   }, [navigationRef]);
 
+  const linking = {
+    prefixes: [Linking.createURL("/"), "aegis://", "aegiswomensafety://"],
+    config: {
+      screens: {
+        IncomingCall: "fakecall",
+      },
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashRouteScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingRouteScreen} />
