@@ -32,7 +32,6 @@ import { ReportScreen } from "../screens/ReportScreen";
 import { CommunityReportsScreen } from "../screens/CommunityReportsScreen";
 import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { HomeStubScreen } from "../screens/HomeStubScreen";
-import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { WearableScreen } from "../screens/WearableScreen";
 import { IncidentsScreen } from "../screens/IncidentsScreen";
 import { NewIncidentScreen } from "../screens/NewIncidentScreen";
@@ -80,7 +79,6 @@ export type RootStackParamList = {
   UploadEvidence: { incidentId?: string } | undefined;
   EvidenceDetail: { id?: string } | undefined;
   HomeStub: undefined;
-  IncomingCall: undefined;
   Wearable: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
@@ -316,7 +314,6 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "AI Assistant") navigation.navigate("Assistant");
         else if (action === "Report Area") navigation.navigate("Report");
         else if (action === "Contacts") navigation.navigate("Profile");
-        else if (action === "Fake Call") navigation.navigate("IncomingCall");
         else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
       }}
       onTab={(t: TabKey) => {
@@ -440,10 +437,6 @@ function EvidenceDetailRouteScreen({ navigation, route }: P<"EvidenceDetail">) {
   return <EvidenceDetailScreen id={route.params?.id} onBack={() => navigation.goBack()} />;
 }
 
-function IncomingCallRouteScreen({ navigation }: P<"IncomingCall">) {
-  return <IncomingCallScreen />;
-}
-
 function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
   return (
     <AdminDashboardScreen
@@ -504,9 +497,7 @@ function MobileApp() {
   useEffect(() => {
     const subscription = addEmergencyActionListener((action: string) => {
       if (navigationRef.isReady()) {
-        if (action === "FAKE_CALL") {
-          navigationRef.navigate("IncomingCall");
-        } else if (action === "SOS") {
+        if (action === "SOS") {
           navigationRef.navigate("Sos", { state: "active" });
         } else if (action === "LIVE_LOCATION") {
           navigationRef.navigate("Home");
@@ -547,7 +538,6 @@ function MobileApp() {
         <Stack.Screen name="UploadEvidence" component={UploadEvidenceRouteScreen} />
         <Stack.Screen name="EvidenceDetail" component={EvidenceDetailRouteScreen} />
         <Stack.Screen name="HomeStub" component={HomeStubScreen} />
-        <Stack.Screen name="IncomingCall" component={IncomingCallRouteScreen} />
         <Stack.Screen name="Wearable" component={WearableScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardRouteScreen} />
         <Stack.Screen name="AdminUsers" component={AdminUsersRouteScreen} />
