@@ -49,8 +49,8 @@ export const normalizeText = (text: string): string => {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?'"“„]/g, '') // Strip punctuation
-    .replace(/\s+/g, ' ') // Collapse multiple spaces to single space
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?'"“„]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 };
 

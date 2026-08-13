@@ -204,7 +204,7 @@ export function SosScreen({
             <Text style={styles.evidenceTitle}>Evidence saved privately</Text>
             <Text style={styles.evidenceSub}>
               Audio and video clips are stored on your device only. Delete them
-              now, or request a full wipe from Data &amp; Privacy.
+              now, or request a full wipe from Data & Privacy.
             </Text>
           </Card>
         </View>

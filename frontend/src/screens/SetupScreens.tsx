@@ -155,7 +155,7 @@ export function SetupGenderScreen({
 
 /* -------------------------------------- 3. Blood group */
 
-const BLOOD = ["A+", "A−", "B+", "B−", "AB+", "AB−", "O+", "O−", "Unknown"];
+const BLOOD = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"];
 
 export function SetupBloodScreen({
   state = "empty",
@@ -380,17 +380,18 @@ export function SetupContactsScreen({
   return (
     <SetupShell
       step={5}
-      title="Who should we call?"
-      subtitle="Choose trusted emergency contacts who will be notified during an emergency."
+      title="Choose trusted contacts"
+      subtitle="People you'd want alerted the second something goes wrong."
       onBack={onBack}
-      onSkip={onSkip || onNext}
-      scroll
+      onSkip={onSkip}
       footer={
         <>
           <AppButton disabled={contacts.length === 0} onPress={onNext}>
             Continue
           </AppButton>
-          <Text style={styles.contactsCaption}>{contacts.length}/5 contacts added</Text>
+          {contacts.length > 0 ? (
+            <Text style={styles.contactsCaption}>{contacts.length}/5 contacts added</Text>
+          ) : null}
         </>
       }
     >
@@ -412,15 +413,11 @@ export function SetupContactsScreen({
         />
       ) : contacts.length === 0 ? (
         <EmptyState
-          illustration={<UserRound color={colors.primary} size={36} strokeWidth={1.4} />}
+          illustration={<UserRound color={colors.primary} size={40} strokeWidth={1.5} />}
           title="No contacts yet"
           body="Choose trusted emergency contacts who will be notified during an emergency."
           action={
-            <AppButton
-              size="md"
-              leading={<Plus size={18} color={colors.primaryForeground} />}
-              onPress={handleSelectContacts}
-            >
+            <AppButton size="md" leading={<Plus size={18} color={colors.primaryForeground} />} onPress={handleSelectContacts}>
               Select Emergency Contacts
             </AppButton>
           }
@@ -449,9 +446,9 @@ export function SetupContactsScreen({
           {isMaxReached ? (
             <Text style={styles.contactsMax}>You've reached the maximum of 5 contacts.</Text>
           ) : (
-            <Pressable onPress={handleOpenSheet} style={styles.contactsAdd}>
+            <Pressable onPress={handleSelectContacts} style={styles.contactsAdd}>
               <Plus size={18} color={colors.primary} />
-              <Text style={styles.contactsAddText}>Import from contacts</Text>
+              <Text style={styles.contactsAddText}>Add a contact</Text>
             </Pressable>
           )}
         </View>

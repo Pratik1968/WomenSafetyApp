@@ -1,11 +1,13 @@
+jest.setTimeout(15000);
+
 jest.mock(
   "expo-contacts",
   () => ({
-    getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     requestPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     getContactsAsync: jest.fn().mockResolvedValue({ data: [] }),
     presentContactPickerAsync: jest.fn().mockResolvedValue(null),
-    Fields: { PhoneNumbers: "phoneNumbers" },
+    Fields: { Name: "name", PhoneNumbers: "phoneNumbers" },
   }),
   { virtual: true }
 );
@@ -13,11 +15,11 @@ jest.mock(
 jest.mock(
   "expo-contacts/legacy",
   () => ({
-    getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     requestPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     getContactsAsync: jest.fn().mockResolvedValue({ data: [] }),
     presentContactPickerAsync: jest.fn().mockResolvedValue(null),
-    Fields: { PhoneNumbers: "phoneNumbers" },
+    Fields: { Name: "name", PhoneNumbers: "phoneNumbers" },
   }),
   { virtual: true }
 );
@@ -27,10 +29,16 @@ jest.mock(
   () => ({
     requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     getForegroundPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+    requestBackgroundPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     getCurrentPositionAsync: jest.fn().mockResolvedValue({
-      coords: { latitude: 12.9716, longitude: 77.5946 },
+      coords: { latitude: 12.9716, longitude: 77.5946, altitude: 0, accuracy: 5 },
+      timestamp: Date.now(),
     }),
-    reverseGeocodeAsync: jest.fn().mockResolvedValue([{ street: "5th Cross", city: "Indiranagar" }]),
+    reverseGeocodeAsync: jest.fn().mockResolvedValue([
+      { name: "5th Cross, Indiranagar", street: "5th Cross", city: "Indiranagar", region: "Karnataka", postalCode: "560038", country: "India" },
+    ]),
+    watchPositionAsync: jest.fn().mockResolvedValue({ remove: jest.fn() }),
+    Accuracy: { Balanced: 3, High: 4 },
   }),
   { virtual: true }
 );
@@ -63,6 +71,7 @@ jest.mock(
   () => ({
     Camera: {
       requestCameraPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+      requestMicrophonePermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
     },
   }),
   { virtual: true }
@@ -99,7 +108,7 @@ jest.mock(
     __esModule: true,
     default: {
       setItem: jest.fn((key, value) => {
-        mockStorage.set(key, value);
+        mockStorage.set(key, String(value));
         return Promise.resolve(null);
       }),
       getItem: jest.fn((key) => {
@@ -113,6 +122,7 @@ jest.mock(
         mockStorage.clear();
         return Promise.resolve(null);
       }),
+      getAllKeys: jest.fn(() => Promise.resolve(Array.from(mockStorage.keys()))),
     },
   }),
   { virtual: true }
@@ -136,11 +146,44 @@ jest.mock(
   { virtual: true }
 );
 
-// Default fetch mock: safe fallback so any incidental network call (profile/contacts/
-// device services) fails fast instead of hitting the network during tests. Individual
-// tests override `global.fetch` when they need to assert on a specific request/response.
+jest.mock(
+  "@supabase/supabase-js",
+  () => ({
+    createClient: jest.fn(() => ({
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        upsert: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        order: jest.fn().mockResolvedValue({ data: [], error: null }),
+        single: jest.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      channel: jest.fn().mockReturnValue({
+        on: jest.fn().mockReturnThis(),
+        subscribe: jest.fn().mockReturnThis(),
+      }),
+      removeChannel: jest.fn(),
+    })),
+  }),
+  { virtual: true }
+);
+
+jest.mock("react-native-url-polyfill/auto", () => {}, { virtual: true });
+
+const { NativeModules } = require("react-native");
+NativeModules.SafetyForegroundModule = {
+  startSafetyService: jest.fn().mockResolvedValue(true),
+  stopSafetyService: jest.fn().mockResolvedValue(true),
+  updateLanguage: jest.fn().mockResolvedValue(true),
+  isServiceRunning: jest.fn().mockResolvedValue(false),
+  addListener: jest.fn(),
+  removeListeners: jest.fn(),
+};
+
+// Default fetch mock: safe fallback so any incidental network call fails fast
+// instead of hitting the network during tests. Individual tests override global.fetch.
 beforeEach(() => {
   global.fetch = jest.fn().mockRejectedValue(new Error("Network unavailable in tests"));
 });
-
-

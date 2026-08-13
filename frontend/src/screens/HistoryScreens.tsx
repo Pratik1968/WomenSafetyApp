@@ -260,9 +260,11 @@ function describeTimelineStep(entry: SOSLogEntry | IncidentEventRecord): { time:
 
 export function IncidentDetailScreen({
   incidentId,
+  id,
   onBack,
 }: {
   incidentId?: string;
+  id?: string;
   onBack?: () => void;
 }) {
   const [incident, setIncident] = useState<SOSIncident | null | undefined>(undefined);

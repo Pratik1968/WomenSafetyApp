@@ -86,9 +86,8 @@ export class EmergencyService {
     this.history.unshift(response);
     this.notifyListeners(response);
 
-    // POST to FastAPI backend — queue offline if network fails
+    // POST to backend — queue offline if network fails
     try {
-      console.log(`📤 [EmergencyService] POST ${API_ENDPOINTS.EMERGENCY_ALERT}`);
       await apiClient.post(API_ENDPOINTS.EMERGENCY_ALERT, fullPayload);
       logger.info('🚨 Emergency alert dispatched to backend successfully.');
     } catch (err) {

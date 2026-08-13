@@ -10,7 +10,6 @@ export const useVoiceRecognition = (): {
   startVoiceListening: () => Promise<void>;
   stopVoiceListening: () => Promise<void>;
 } => {
-  // Placeholder: Voice recognition state hook
   return {
     isListening: false,
     lastDetection: null,

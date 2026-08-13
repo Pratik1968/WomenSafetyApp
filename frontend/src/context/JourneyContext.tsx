@@ -18,11 +18,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { ActiveJourney, JourneyConfig, JourneyEmergencyEvent } from '../modules/safetyMode/types/journey.types';
 import { journeyService } from '../modules/safetyMode/services/journeyService';
+import { safetyForegroundBridge } from '../modules/voice/services/safetyForegroundBridge';
 import { useVoiceState } from './VoiceContext';
 import { firebaseAuthService } from '../infrastructure/auth/firebaseAuthService';
 import { logger } from '../utils/logger';
-
-// ─── Context Shape ─────────────────────────────────────────────────────────────
 
 interface JourneyContextType {
   /** Whether a journey is currently running (ACTIVE or EMERGENCY state) */
@@ -42,8 +41,6 @@ interface JourneyContextType {
   setSensitivityThreshold: (v: number) => void;
 }
 
-// ─── Default Context Values ───────────────────────────────────────────────────
-
 const JourneyContext = createContext<JourneyContextType>({
   isJourneyActive: false,
   currentJourney: null,
@@ -55,8 +52,6 @@ const JourneyContext = createContext<JourneyContextType>({
   setSensitivityThreshold: () => {},
 });
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export const JourneyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentJourney, setCurrentJourney] = useState<ActiveJourney | null>(null);
   const [sensitivityThreshold, setSensitivityThreshold] = useState<number>(0.6);
@@ -67,12 +62,24 @@ export const JourneyProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Track the last transcript forwarded to avoid re-evaluation on every render
   const lastForwardedText = useRef<string>('');
 
-  // ── Subscribe to journeyService changes ──────────────────────────────────
+  // ── Subscribe to journeyService & native bridge emergency events ───────────
   useEffect(() => {
-    const unsub = journeyService.onJourneyChange((journey) => {
+    const unsubJourney = journeyService.onJourneyChange((journey) => {
       setCurrentJourney(journey ? { ...journey } : null);
     });
-    return () => unsub();
+
+    const unsubBridgeEmergency = safetyForegroundBridge.onEmergencyKeyword((data) => {
+      logger.warn(`[JourneyContext] Emergency event received: "${data.keyword}"`);
+      const active = journeyService.getActiveJourney();
+      if (active) {
+        setCurrentJourney({ ...active });
+      }
+    });
+
+    return () => {
+      unsubJourney();
+      unsubBridgeEmergency();
+    };
   }, []);
 
   // ── Forward voice transcripts to journeyService during an active journey ─
@@ -111,7 +118,7 @@ export const JourneyProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       const userId = (await firebaseAuthService.getCurrentUserId()) || 'anonymous';
       lastForwardedText.current = '';
-      await journeyService.startJourney(config, userId);
+      await journeyService.startJourney(config, userId, currentLanguage);
       logger.info('[JourneyContext] Journey started via context.');
     } catch (err) {
       logger.error('[JourneyContext] Failed to start journey:', err);
@@ -141,7 +148,5 @@ export const JourneyProvider: React.FC<{ children: ReactNode }> = ({ children })
     </JourneyContext.Provider>
   );
 };
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useJourney = (): JourneyContextType => useContext(JourneyContext);

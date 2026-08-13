@@ -1,9 +1,11 @@
 /**
  * API Central Configuration
- * Dynamically resolves API base URL purely from environment variables.
+ * Dynamically resolves API base URL from environment variables with fallbacks.
  */
 
 import { Platform } from 'react-native';
+
+const ENV = process.env.NODE_ENV || 'development';
 
 export const getBaseUrl = (): string => {
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -11,6 +13,10 @@ export const getBaseUrl = (): string => {
   if (envApiUrl) {
     console.log('[apiConfig] API URL resolved from environment →', envApiUrl);
     return envApiUrl;
+  }
+
+  if (ENV === 'production') {
+    return 'https://api.aegissafety.app';
   }
 
   // Fallback for local development when .env is not set:

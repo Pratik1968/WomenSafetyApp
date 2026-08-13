@@ -17,7 +17,7 @@ interface VoiceContextType {
   currentLanguage: SupportedLanguage;
   volumeLevel: number;
   speechError: string | null;
-  startListening: (locale?: SupportedLanguage) => Promise<void>;
+  startListening: (locale?: SupportedLanguage, continuousBackground?: boolean) => Promise<void>;
   stopListening: () => Promise<void>;
   cancelListening: () => Promise<void>;
   changeLanguage: (lang: SupportedLanguage) => void;
@@ -75,11 +75,11 @@ export const VoiceProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  const startListening = async (locale?: SupportedLanguage): Promise<void> => {
+  const startListening = async (locale?: SupportedLanguage, continuousBackground?: boolean): Promise<void> => {
     try {
       setSpeechError(null);
       const lang = locale || currentLanguage;
-      await voiceRecognitionService.startListening(lang);
+      await voiceRecognitionService.startListening(lang, continuousBackground);
     } catch (err: any) {
       logger.error('Failed to start listening in VoiceContext:', err);
       setSpeechError(err.message || 'Failed to start speech recognition.');
