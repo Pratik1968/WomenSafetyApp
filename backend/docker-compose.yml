@@ -17,3 +17,36 @@ services:
       - DATABASE_URL=sqlite:///./women_safety.db
     volumes:
       - .:/app
+
+  # Nginx API Gateway (Front-facing Reverse Proxy)
+  api-gateway:
+    image: nginx:alpine
+    container_name: aegis-api-gateway
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - notification-service
+    networks:
+      - aegis-network
+
+  # Notification Microservice (FastAPI)
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: aegis-notification-service
+    restart: always
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    networks:
+      - aegis-network
+
+networks:
+  aegis-network:
+    driver: bridge
+
