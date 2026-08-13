@@ -17,11 +17,21 @@ jest.mock("./behaviorAnalysisService", () => ({
   evaluate: jest.fn().mockResolvedValue(null),
   reset: jest.fn(),
 }));
+jest.mock("../modules/audio", () => ({
+  audioRecordingService: {
+    startRecording: jest.fn().mockResolvedValue({ success: true, fileUri: "file:///mock/audio.m4a" }),
+    stopAndUpload: jest.fn().mockResolvedValue({ success: true }),
+    stopRecording: jest.fn().mockResolvedValue({ success: true }),
+    isRecording: jest.fn().mockReturnValue(false),
+    getStatus: jest.fn().mockReturnValue({ state: "IDLE", isRecording: false }),
+  },
+}));
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { syncIncidentEvent } from "./incidentSyncService";
 import { triggerSOS, cancelSOS, getIncidentById } from "./sosOrchestratorService";
 import * as behaviorAnalysisService from "./behaviorAnalysisService";
+import { audioRecordingService } from "../modules/audio";
 
 const mockedSync = syncIncidentEvent as jest.Mock;
 
@@ -92,7 +102,7 @@ describe("sosOrchestratorService backend sync", () => {
     // Simulate poor connectivity: the sync call never resolves (worse than a
     // slow one — proves triggerSOS truly doesn't await it, not just that it
     // tolerates a long-but-finite delay).
-    mockedSync.mockImplementation(() => new Promise(() => {}));
+    mockedSync.mockImplementation(() => new Promise(() => { }));
 
     const start = Date.now();
     const incidentId = await triggerSOS("BUTTON");
@@ -131,5 +141,64 @@ describe("sosOrchestratorService — Module 18 AI behavior analysis integration"
 
     await cancelSOS(incidentId, "resolved");
     expect(mockedReset).toHaveBeenCalled();
+  });
+});
+
+describe("sosOrchestratorService — Module 6 Audio Recording lifecycle integration", () => {
+  const mockedStartRecording = audioRecordingService.startRecording as jest.Mock;
+  const mockedStopAndUpload = audioRecordingService.stopAndUpload as jest.Mock;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    mockedSync.mockClear();
+    mockedSync.mockResolvedValue(undefined);
+    mockedStartRecording.mockClear();
+    mockedStartRecording.mockResolvedValue({ success: true, fileUri: "file:///mock/audio.m4a" });
+    mockedStopAndUpload.mockClear();
+    mockedStopAndUpload.mockResolvedValue({ success: true });
+  });
+
+  it("automatically starts audio recording with the real incident ID on triggerSOS", async () => {
+    const incidentId = await triggerSOS("BUTTON");
+
+    expect(mockedStartRecording).toHaveBeenCalledTimes(1);
+    expect(mockedStartRecording).toHaveBeenCalledWith(incidentId);
+  });
+
+  it("automatically stops and uploads audio recording with the real incident ID on cancelSOS", async () => {
+    const incidentId = await triggerSOS("SHAKE");
+
+    await cancelSOS(incidentId, "resolved");
+
+    expect(mockedStopAndUpload).toHaveBeenCalledTimes(1);
+    expect(mockedStopAndUpload).toHaveBeenCalledWith(incidentId);
+  });
+
+  it("does not crash or fail triggerSOS if audio recording start fails or throws", async () => {
+    mockedStartRecording.mockRejectedValueOnce(new Error("Microphone permission denied"));
+
+    const incidentId = await triggerSOS("BUTTON");
+
+    expect(incidentId).toEqual(expect.any(String));
+    const incident = await getIncidentById(incidentId);
+    expect(incident?.status).toBe("active");
+  });
+
+  it("does not crash or fail cancelSOS if audio upload fails or throws", async () => {
+    const incidentId = await triggerSOS("BUTTON");
+    mockedStopAndUpload.mockRejectedValueOnce(new Error("Supabase storage upload timeout"));
+
+    await expect(cancelSOS(incidentId, "resolved")).resolves.not.toThrow();
+
+    const incident = await getIncidentById(incidentId);
+    expect(incident?.status).toBe("resolved");
+  });
+
+  it("passes trigger source correctly and starts recording without requiring manual UI action", async () => {
+    const incidentId = await triggerSOS("SHAKE");
+
+    expect(mockedStartRecording).toHaveBeenCalledWith(incidentId);
+    const incident = await getIncidentById(incidentId);
+    expect(incident?.source).toBe("SHAKE");
   });
 });

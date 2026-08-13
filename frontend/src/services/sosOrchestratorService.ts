@@ -30,6 +30,7 @@ import { sendSilentSms, makeSilentCall } from "./sosNativeService";
 import { auth } from "./firebaseConfig";
 import { syncIncidentEvent } from "./incidentSyncService";
 import * as behaviorAnalysisService from "./behaviorAnalysisService";
+import { audioRecordingService } from "../modules/audio";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -342,6 +343,25 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
   // never delay the SOS pipeline (see syncStepToBackend's doc comment).
   void syncStepToBackend(incident, "SOS_TRIGGERED", { source });
 
+  // ── Step 1.1: Start automatic ambient audio recording (Module 6) ────────
+  // Fire-and-forget: do not await — audio initialization must never delay the SOS pipeline
+  void audioRecordingService
+    .startRecording(incidentId)
+    .then((res) => {
+      if (res.success) {
+        void appendLog(incidentId, "AUDIO_RECORDING_STARTED", {
+          fileUri: res.fileUri,
+        });
+      } else {
+        void appendLog(incidentId, "AUDIO_RECORDING_FAILED", {
+          reason: res.error,
+        });
+      }
+    })
+    .catch((err) => {
+      console.warn("[sosOrchestrator] Audio recording startup error:", err);
+    });
+
   // ── Step 2: Get location (with fallback) ────────────────────
   const location = await acquireLocation();
   await patchIncident(incidentId, (inc) => ({ ...inc, location }));
@@ -488,4 +508,19 @@ export async function cancelSOS(
     endTime: Date.now(),
   }));
   await appendLog(incidentId, "SOS_ENDED", { status });
+
+  // ── Stop & upload automatic audio recording evidence (Module 6) ─────────
+  // Fire-and-forget: do not await — upload delays must never block SOS resolution
+  void audioRecordingService
+    .stopAndUpload(incidentId)
+    .then((res) => {
+      if (res.success) {
+        void appendLog(incidentId, "AUDIO_RECORDING_FINALIZED", { status: "uploaded" });
+      } else {
+        void appendLog(incidentId, "AUDIO_RECORDING_UPLOAD_FAILED", { error: res.error });
+      }
+    })
+    .catch((err) => {
+      console.warn("[sosOrchestrator] Audio recording stop/upload error:", err);
+    });
 }
