@@ -3,5 +3,25 @@
   // `jsr:` / `npm:` / URL imports resolve. Everything else (the Expo/React
   // Native app in frontend/) stays on the normal TypeScript server.
   "deno.enablePaths": ["backend"],
-  "deno.enable": false
+  "deno.enable": false,
+
+  // Prevent the VS Code Java extension from treating Gradle plugin sub-projects
+  // inside node_modules as Java workspace projects. Without this, it tries to
+  // open react-native-gradle-plugin, settings-plugin, shared, and
+  // expo-module-gradle-plugin as standalone Java projects and reports 7 errors
+  // because it cannot resolve their Gradle-managed classpaths.
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/android/build/**",
+    "**/frontend/android/.gradle/**"
+  ],
+
+  // Do not search for Java projects inside node_modules.
+  "java.project.sourcePaths": [],
+
+  // Hide Java build/class output from the file explorer in node_modules.
+  "files.exclude": {
+    "**/node_modules/**/.project": true,
+    "**/node_modules/**/.classpath": true
+  }
 }
