@@ -21,10 +21,7 @@ from app.core.logging import logger
 
 router = APIRouter(prefix="/emergency", tags=["Emergency Service & SOS"])
 
-# In-memory store for incident events (fallback when DB is unavailable)
 _incident_events: List[Dict[str, Any]] = []
-
-
 
 def _resolve_caller_user_id(current_uid: str) -> str:
     caller = UserRepository().get_by_firebase_uid(current_uid)
@@ -113,7 +110,6 @@ async def trigger_sos_incident(
     if _resolve_caller_user_id(current_uid) != payload.user_id:
         raise HTTPException(status_code=403, detail="Cannot trigger an SOS for another user")
 
-    # Dispatch emergency push alert notification to the user's registered devices
     notification_service = NotificationService(db)
     notification_service.send_sos_alert_to_user(
         user_id=payload.user_id,
@@ -132,15 +128,8 @@ async def trigger_sos_incident(
     )
 
 
-# ── Incident Step Sync ────────────────────────────────────────────────────────
-
 @router.post("/incidents/sync", status_code=status.HTTP_200_OK)
 async def sync_incident_event(payload: IncidentSyncPayload):
-    """
-    Receive one SOS step event from the mobile app and persist it.
-    Called for every step (SOS_TRIGGERED, LOCATION_ACQUIRED, SMS_SENT, …).
-    No auth dependency — called during active emergencies where auth may be disrupted.
-    """
     event_id = str(uuid.uuid4())
     occurred_at_iso = datetime.fromtimestamp(payload.occurredAt / 1000, tz=timezone.utc).isoformat()
     started_at_iso = datetime.fromtimestamp(payload.startedAt / 1000, tz=timezone.utc).isoformat()
@@ -149,8 +138,6 @@ async def sync_incident_event(payload: IncidentSyncPayload):
         f"[incidents/sync] step={payload.step} clientIncidentId={payload.clientIncidentId} "
         f"uid={payload.firebaseUid} status={payload.status}"
     )
-    logger.info(f"  location: {payload.location}")
-    logger.info(f"  stepData: {payload.stepData}")
 
     event: Dict[str, Any] = {
         "id": event_id,
@@ -173,13 +160,7 @@ async def sync_incident_event(payload: IncidentSyncPayload):
 async def get_incident_history(
     firebaseUid: str = Query(..., description="Firebase UID of the requesting user"),
 ):
-    """
-    Return summarised SOS history for a user (one entry per clientIncidentId,
-    carrying the status of the most-recent step).
-    """
     events = [e for e in _incident_events if e.get("firebaseUid") == firebaseUid]
-
-    # Collapse to one entry per clientIncidentId — last write (latest step) wins
     seen: Dict[str, Any] = {}
     for ev in events:
         cid = ev["clientIncidentId"]

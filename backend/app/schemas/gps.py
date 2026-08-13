@@ -56,4 +56,3 @@ class FamilyLiveTrackingData(BaseModel):
     battery_level: int
     last_updated_at: str
     is_active: bool
-

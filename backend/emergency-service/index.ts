@@ -52,6 +52,51 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
   try {
+    // ===== TIMELINE ROUTES (Module #19) =====
+    if (seg[0] === "timeline") {
+      // GET /timeline?incident_id=...
+      if (req.method === "GET") {
+        const incidentId = url.searchParams.get("incident_id");
+        if (!incidentId) return json({ error: "incident_id parameter is required" }, 400);
+
+        // Fetch events from incident_timeline (RLS enforces ownership)
+        const { data, error } = await supabase
+          .from("incident_timeline")
+          .select("*")
+          .eq("incident_id", incidentId)
+          .order("created_at", { ascending: true });
+
+        if (error) return json({ error: error.message }, 400);
+        return json({ events: data ?? [] });
+      }
+
+      // POST /timeline -> append timeline event
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        const { incident_id, event_type, title, description, metadata, occurred_at } = body ?? {};
+        if (!incident_id || !event_type || !title) {
+          return json({ error: "incident_id, event_type, and title are required" }, 400);
+        }
+
+        const { data, error } = await supabase
+          .from("incident_timeline")
+          .insert({
+            incident_id,
+            event_type,
+            title,
+            description: description ?? null,
+            metadata: metadata ?? {},
+            created_at: occurred_at ? new Date(occurred_at).toISOString() : new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) return json({ error: error.message }, 400);
+        return json({ event: data }, 201);
+      }
+      return json({ error: "not found" }, 404);
+    }
+
     if (seg[0] !== "evidence") return json({ error: "not found" }, 404);
 
     // ----- GET /evidence (list) -----

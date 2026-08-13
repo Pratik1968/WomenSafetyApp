@@ -11,10 +11,6 @@ from app.core.logging import logger
 
 TABLE = "users"
 
-# public.users.gender is a Postgres enum (gender_enum) with uppercase/underscore
-# labels (FEMALE, MALE, OTHER, PREFER_NOT_TO_SAY). The mobile UI shows
-# human-friendly labels ("Female", "Prefer not to say") - normalize here so the
-# UI never needs to know the backend's enum casing.
 GENDER_ENUM_MAP = {
     "female": "FEMALE",
     "male": "MALE",
@@ -125,8 +121,6 @@ class UserRepository:
         if payload.medical_notes is not None:
             fields["medical_notes"] = payload.medical_notes
 
-        # If this phone is already registered under a different firebase_uid, update that
-        # row instead of inserting a duplicate (user verified OTP on this phone).
         if payload.phone:
             existing_by_phone = self.get_by_identifier(payload.phone)
             if existing_by_phone and existing_by_phone.get("firebase_uid") != payload.firebase_uid:
@@ -263,6 +257,32 @@ class UserRepository:
 
         return None
 
+    def relink_firebase_uid(self, user_id: str, new_firebase_uid: str) -> Dict[str, Any]:
+        """Point an existing row (found by phone) at the Firebase UID the caller just verified with."""
+        client = self._client()
+        if client is None:
+            db = self._local_session()
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    user.firebase_uid = new_firebase_uid
+                    user.updated_at = datetime.utcnow()
+                    db.commit()
+                    db.refresh(user)
+                    return _user_to_dict(user)
+                return {}
+            finally:
+                db.close()
+
+        now = datetime.now(timezone.utc).isoformat()
+        result = (
+            client.table(TABLE)
+            .update({"firebase_uid": new_firebase_uid, "updated_at": now})
+            .eq("id", user_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
     def set_password(self, firebase_uid: str, password_hash: str) -> Dict[str, Any]:
         """Store password_hash in database for user."""
         existing = self.get_by_firebase_uid(firebase_uid)
@@ -280,8 +300,7 @@ class UserRepository:
         }).eq("firebase_uid", firebase_uid).execute()
         if not res.data:
             raise RuntimeError(
-                "Could not save password. Ensure the users table has a password_hash column "
-                "(run backend/database/supabase_password_hash_migration.sql in Supabase)."
+                "Could not save password. Ensure the users table has a password_hash column."
             )
         logger.info(f"Password set in DB for firebase_uid={firebase_uid[:8]}...")
         return res.data[0]

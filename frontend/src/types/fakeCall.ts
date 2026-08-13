@@ -17,8 +17,17 @@ export interface VoicePreset {
 }
 
 export interface FakeCallConfig {
-  callerName: 'Mom ❤️' | 'Dad ❤️';
+  callerName: 'Mom' | 'Dad';
   ringtone: string;
   vibrate: boolean;
   autoPlayVoice: boolean;
+  delayMinutes: number;
+}
+
+export interface FakeCallState {
+  isCallActive: boolean;
+  isRinging: boolean;
+  scheduledTime: number | null;
+  activeProfile: CallerProfile | null;
+  durationSeconds: number;
 }

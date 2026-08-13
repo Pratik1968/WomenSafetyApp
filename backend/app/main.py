@@ -56,7 +56,6 @@ async def external_track_page(session_id: str):
 @app.get("/web")
 async def track_html_page(sessionId: str = "trk_demo"):
     return await track_web_page(sessionId)
-
 @app.get("/")
 async def root():
     return {

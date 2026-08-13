@@ -32,6 +32,7 @@ import { syncIncidentEvent } from "./incidentSyncService";
 import { API_BASE_URL } from "../api/config";
 import { getPublicTrackingUrl } from "../utils/trackingUrl";
 import { startLiveLocationSharing, stopLiveLocationSharing } from "./liveLocationSharing";
+import * as behaviorAnalysisService from "./behaviorAnalysisService";
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -321,6 +322,9 @@ export async function getIncidentById(id: string): Promise<SOSIncident | undefin
  * @returns The incidentId (use to track / cancel this incident)
  */
 export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
+  // Module 18: fresh incident, fresh behavior-analysis buffer.
+  behaviorAnalysisService.reset();
+
   // Ensure native Android runtime permissions (SEND_SMS, CALL_PHONE, POST_NOTIFICATIONS)
   await ensureAndroidPermissions();
 
@@ -456,6 +460,15 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
             lon: loc.lon,
           });
         }
+
+        // Module 18: AI Behavior Analysis — best-effort, never blocks the location watcher
+        behaviorAnalysisService
+          .evaluate({ lat: loc.lat, lon: loc.lon, timestampMs: loc.timestamp })
+          .then((alert) => {
+            if (!alert) return;
+            return appendLog(incidentId, alert.eventType, { detail: alert.detail });
+          })
+          .catch(() => {});
       }
     );
     await appendLog(incidentId, "LIVE_TRACKING_STARTED", {});
@@ -484,6 +497,8 @@ export async function cancelSOS(
 ): Promise<void> {
   // Stop 4.5s live location sharing stream
   void stopLiveLocationSharing(incidentId);
+  // Module 18: incident is ending, clear the behavior-analysis buffer.
+  behaviorAnalysisService.reset();
 
   // Stop live location tracking
   if (locationWatcher) {

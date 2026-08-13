@@ -13,6 +13,7 @@ import {
   Bell,
   ShieldCheck,
   ChevronRight,
+  UserRoundPlus,
   Route as RouteIcon,
   Ambulance,
   Sparkles,
@@ -57,6 +58,7 @@ const QUICK_ACTIONS = [
   { label: "AI Assistant", icon: Sparkles },
   { label: "Report Area", icon: Flag },
   { label: "Contacts", icon: Users },
+  { label: "Register Face", icon: UserRoundPlus },
 ];
 
 const RECENT_ACTIVITY = [

@@ -71,4 +71,3 @@ class IncidentHistoryItem(BaseModel):
     status: str
     startedAt: str
     firebaseUid: Optional[str] = None
-
