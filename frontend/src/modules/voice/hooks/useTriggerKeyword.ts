@@ -9,7 +9,6 @@ export const useTriggerKeyword = (): {
   updateKeyword: (newKeyword: string) => void;
   updateSensitivity: (sensitivity: number) => void;
 } => {
-  // Placeholder: Custom trigger keyword configuration hook
   return {
     config: {
       keyword: 'HELP',

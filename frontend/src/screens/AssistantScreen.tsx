@@ -22,6 +22,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -127,10 +128,32 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
   }, [aiMessages, isThinking]);
 
   const handleSend = (text?: string) => {
+    if (isThinking) return;
     const msg = (text ?? input).trim();
     if (!msg) return;
     sendChatMessage(msg);
     setInput("");
+  };
+
+  const handleActionPress = (action: string, directionsUrl?: string) => {
+    if (action === "Call 112") {
+      Linking.openURL("tel:112").catch(() => handleSend(action));
+      return;
+    }
+    if (action === "Call 108" || action === "Call Ambulance") {
+      Linking.openURL("tel:108").catch(() => handleSend(action));
+      return;
+    }
+    if (action === "Call NCW Helpline") {
+      Linking.openURL("tel:7827170170").catch(() => handleSend(action));
+      return;
+    }
+    if (action === "Directions") {
+      const url = directionsUrl || "https://maps.google.com/?q=Police+Station";
+      Linking.openURL(url).catch(() => handleSend(action));
+      return;
+    }
+    handleSend(action);
   };
 
   return (
@@ -139,6 +162,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={0}
     >
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <NavBar
         title="Ask Aegis"
         onBack={onBack}
@@ -156,22 +180,25 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         }
       />
 
+      {/* ── Location strip ─────────────────────────────────────────────────── */}
       {formattedAddress ? (
         <View style={styles.locationBar}>
           <MapPin size={12} color={colors.primary} />
           <Text style={styles.locationBarText} numberOfLines={1}>
             {formattedAddress}
           </Text>
-          <Text style={styles.locationBarBadge}>· Police 0.8km · Hospital 1.2km</Text>
+          <Text style={styles.locationBarBadge}>🚔 Police 0.8km · 🏥 Hospital 1.2km</Text>
         </View>
       ) : null}
 
+      {/* ── Offline banner ─────────────────────────────────────────────────── */}
       {networkError ? (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineBannerText}>⚡ Offline — cached responses in use</Text>
+          <Text style={styles.offlineBannerText}>⚠ Offline — cached responses in use</Text>
         </View>
       ) : null}
 
+      {/* ── Chat area ──────────────────────────────────────────────────────── */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -182,6 +209,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         keyboardShouldPersistTaps="handled"
       >
         {!hasConversation ? (
+          /* ── Welcome state ─────────────────────────────────────────────── */
           <View style={styles.welcomeWrap}>
             <LinearGradient
               colors={gradientBrand as unknown as [string, string, ...string[]]}
@@ -195,6 +223,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
             </Text>
           </View>
         ) : (
+          /* ── Messages list ─────────────────────────────────────────────── */
           <View style={styles.messagesList}>
             {aiMessages.map((m) => {
               if (m.role === "user") {
@@ -202,8 +231,6 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
                   <View key={m.id} style={styles.userRow}>
                     <LinearGradient
                       colors={gradientBrand as unknown as [string, string, ...string[]]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
                       style={styles.userBubble}
                     >
                       <Text style={styles.userBubbleText}>{m.content}</Text>
@@ -215,36 +242,42 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
                 );
               }
 
+              // Assistant message
               const meta = getIntentMeta(m.intent);
               const IconComp = meta.icon;
               const actions = m.actionPayload?.suggestedActions ?? [];
 
               return (
                 <View key={m.id} style={styles.aegisRow}>
+                  {/* Avatar */}
                   <View style={[styles.aegisBubbleAvatar, { backgroundColor: `${meta.color}18` }]}>
                     <IconComp size={14} color={meta.color} strokeWidth={2} />
                   </View>
 
                   <View style={styles.aegisBubbleWrap}>
+                    {/* Title row */}
                     <Text style={[styles.aegisBubbleTitle, { color: meta.color }]}>
                       {meta.title}
                     </Text>
 
+                    {/* Body */}
                     <View style={styles.aegisBubble}>
                       <Text style={styles.aegisBubbleText}>{m.content}</Text>
                     </View>
 
+                    {/* Action chips */}
                     {actions.length > 0 && (
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.actionChipsRow}
+                        keyboardShouldPersistTaps="handled"
                       >
                         {actions.map((action) => (
                           <Pressable
                             key={action}
                             style={styles.actionChip}
-                            onPress={() => handleSend(action)}
+                            onPress={() => handleActionPress(action, m.actionPayload?.directionsUrl)}
                           >
                             <Text style={styles.actionChipText}>{action}</Text>
                             <ChevronRight size={12} color={colors.primary} />
@@ -253,6 +286,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
                       </ScrollView>
                     )}
 
+                    {/* Timestamp */}
                     <Text style={styles.messageTime}>
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </Text>
@@ -261,11 +295,13 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
               );
             })}
 
+            {/* Typing indicator */}
             {isThinking && <TypingIndicator />}
           </View>
         )}
       </ScrollView>
 
+      {/* ── Suggestion chips (only before first message) ─────────────────── */}
       {!hasConversation && (
         <ScrollView
           horizontal
@@ -289,6 +325,7 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
         </ScrollView>
       )}
 
+      {/* ── Composer ──────────────────────────────────────────────────────── */}
       <View style={styles.composerContainer}>
         <View style={styles.composerBar}>
           <TextInput
@@ -315,11 +352,15 @@ export function AssistantScreen({ onBack }: { onBack?: () => void }) {
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
+
+  // ── Header
   headerActionBtn: {
     width: 36,
     height: 36,
@@ -344,6 +385,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.primaryForeground,
   },
+
+  // ── Location bar
   locationBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -365,6 +408,8 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: "500",
   },
+
+  // ── Offline banner
   offlineBanner: {
     backgroundColor: "#fef3c7",
     borderBottomWidth: 1,
@@ -378,6 +423,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
+
+  // ── Scroll
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
@@ -389,6 +436,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // ── Welcome state
   welcomeWrap: {
     alignItems: "center",
     paddingHorizontal: 24,
@@ -414,7 +463,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+
+  // ── Messages
   messagesList: { gap: 16 },
+
+  // User bubble
   userRow: { alignItems: "flex-end", gap: 3 },
   userBubble: {
     maxWidth: "82%",
@@ -428,6 +481,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: colors.primaryForeground,
   },
+
+  // Aegis bubble
   aegisRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -465,6 +520,8 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: colors.foreground,
   },
+
+  // Action chips under aegis bubble
   actionChipsRow: { gap: 6, paddingTop: 2, paddingBottom: 2 },
   actionChip: {
     flexDirection: "row",
@@ -482,11 +539,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.primary,
   },
+
+  // Timestamp
   messageTime: {
     fontSize: 11,
     color: `${colors.mutedForeground}aa`,
     paddingHorizontal: 2,
   },
+
+  // ── Typing indicator
   typingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -517,6 +578,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.mutedForeground,
   },
+
+  // ── Suggestion chips row
   chipsRow: {
     gap: 7,
     paddingHorizontal: 16,
@@ -539,6 +602,8 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: "500",
   },
+
+  // ── Composer
   composerContainer: {
     paddingHorizontal: 14,
     paddingTop: 8,
@@ -585,4 +650,3 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 });
-

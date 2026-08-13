@@ -25,6 +25,7 @@ export class NetworkMonitor {
   private isOnlineStatus: boolean = true;
   private listeners: Array<(isOnline: boolean) => void> = [];
   private isProcessingQueue: boolean = false;
+  private heartbeatTimer: any = null;
 
   private constructor() {
     this.startHeartbeatMonitor();
@@ -136,6 +137,10 @@ export class NetworkMonitor {
   }
 
   private startHeartbeatMonitor(): void {
+    if (process.env.NODE_ENV === 'test') {
+      return; // Skip background timer during tests
+    }
+
     const checkHealth = async () => {
       const healthUrl = `${API_CONFIG.baseURL}${API_ENDPOINTS.HEALTH}`;
       console.log(`🏥 [Health Check] Pinging: ${healthUrl}`);
@@ -162,8 +167,8 @@ export class NetworkMonitor {
     // Run initial health check immediately on startup
     checkHealth();
 
-    // Ping health endpoint every 15 seconds
-    setInterval(checkHealth, 15000);
+    // Ping health endpoint every 30 seconds
+    this.heartbeatTimer = setInterval(checkHealth, 30000);
   }
 }
 

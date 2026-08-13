@@ -15,11 +15,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.nameisrk.aegiswomensafety",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow WomenSafty to access the camera to record video evidence during an active SOS emergency or photo reports.",
-        "NSMicrophoneUsageDescription": "Allow WomenSafty to access the microphone to record audio evidence during an active SOS emergency.",
-        "NSLocationWhenInUseUsageDescription": "Allow WomenSafty to access your location to broadcast SOS coordinates.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow WomenSafty to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
-        "NSContactsUsageDescription": "Allow WomenSafty to access your contacts to select emergency contacts for SOS alerts."
+        "NSCameraUsageDescription": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+        "NSMicrophoneUsageDescription": "Allow Aegis to access the microphone for emergency voice recognition and audio evidence.",
+        "NSLocationWhenInUseUsageDescription": "Allow Aegis to access your location to broadcast SOS coordinates.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+        "NSContactsUsageDescription": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
       }
     },
     "android": {
@@ -39,6 +39,7 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
@@ -47,25 +48,24 @@
         "android.permission.SEND_SMS",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow WomenSafty to access your contacts to select emergency contacts for SOS alerts."
+          "contactsPermission": "Allow Aegis to access your contacts to select emergency contacts for SOS alerts."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow WomenSafty to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Aegis to access your location in the background to monitor your journey and broadcast SOS coordinates even when your phone screen is locked.",
           "locationWhenInUsePermission": "Allow location access to attach GPS evidence to an incident.",
           "isAndroidBackgroundLocationEnabled": true
         }
@@ -80,19 +80,19 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow WomenSafty to access the camera to record video evidence during an active SOS emergency or photo reports.",
-          "microphonePermission": "Allow WomenSafty to access the microphone to record audio evidence during an active SOS emergency.",
+          "cameraPermission": "Allow Aegis to access the camera to record video evidence during an active SOS emergency or photo reports.",
+          "microphonePermission": "Allow Aegis to access the microphone to record audio evidence during an active SOS emergency.",
           "recordAudioAndroid": true
         }
       ],
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow WomenSafty to access your microphone for emergency voice recognition."
+          "microphonePermission": "Allow Aegis to access your microphone for emergency voice recognition."
         }
       ],
-      "./plugins/withSafetyFeatures"
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ]
   }
 }
-

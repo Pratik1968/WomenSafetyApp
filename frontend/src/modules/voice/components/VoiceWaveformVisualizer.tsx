@@ -16,7 +16,6 @@ export const VoiceWaveformVisualizer: React.FC<VoiceWaveformVisualizerProps> = (
   isListening,
   volumeLevel = 0,
 }) => {
-  // Generate bar heights dynamically scaled by live microphone volume level
   const baseHeights = [0.2, 0.5, 0.9, 0.6, 0.8, 0.4, 0.7, 0.3, 0.65, 0.85, 0.5, 0.2];
 
   return (

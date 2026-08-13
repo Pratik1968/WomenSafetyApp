@@ -14,7 +14,6 @@ export const usePermissions = (): {
   permissions: PermissionsState;
   requestAllPermissions: () => Promise<boolean>;
 } => {
-  // Placeholder: Manage runtime permissions state
   return {
     permissions: {
       hasBluetoothPermission: false,

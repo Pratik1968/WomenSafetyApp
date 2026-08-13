@@ -21,7 +21,6 @@ interface VoiceSampleItem {
 }
 
 export const VoiceTrainingScreen: React.FC = () => {
-
   // Live Speech Recognition Hook
   const { isListening, recognizedText, volumeLevel, startListening, stopListening } = useVoiceSpeech();
 
