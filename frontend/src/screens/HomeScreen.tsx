@@ -47,7 +47,6 @@ export type HomeState = "default" | "monitoring" | "caution" | "loading";
 
 const QUICK_ACTIONS = [
   { label: "Safe Route", icon: RouteIcon },
-  { label: "Fake Call", icon: PhoneCall },
   { label: "Nearby Police", icon: ShieldCheck },
   { label: "Hospitals", icon: Ambulance },
   { label: "AI Assistant", icon: Sparkles },
