@@ -11,6 +11,7 @@ from app.api.v1.evidence import router as evidence_router
 from app.api.v1.incidents import router as incidents_router
 from app.api.v1.devices import router as devices_router
 from app.api.v1.health import router as health_router
+from app.api.v1.reports import router as reports_router
 from app.api.v1.face.router import router as face_router
 
 api_v1_router = APIRouter()
@@ -26,6 +27,7 @@ api_v1_router.include_router(evidence_router)
 api_v1_router.include_router(incidents_router)
 api_v1_router.include_router(devices_router)
 api_v1_router.include_router(health_router)
+api_v1_router.include_router(reports_router)
 api_v1_router.include_router(face_router)
 
 __all__ = ["api_v1_router"]
