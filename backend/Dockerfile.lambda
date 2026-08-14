@@ -1,0 +1,18 @@
+# Lambda container image for the FastAPI backend. Separate from the existing
+# Dockerfile (which builds a normal long-running uvicorn server for docker-compose) —
+# this one targets AWS Lambda's container runtime interface.
+FROM public.ecr.aws/lambda/python:3.12
+
+# opencv-python-headless (Module 16 face recognition) still needs a couple of shared
+# libraries at runtime even in headless mode, on Amazon Linux these aren't preinstalled.
+# python:3.12 base = Amazon Linux 2023 (dnf, newer glibc — required for onnxruntime>=1.20;
+# python:3.11 base = Amazon Linux 2's older glibc can't satisfy modern onnxruntime wheels).
+RUN dnf install -y mesa-libGL glib2 libSM libXrender libXext && dnf clean all
+
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+COPY models/ ${LAMBDA_TASK_ROOT}/models/
+
+CMD ["app.lambda_handler.handler"]

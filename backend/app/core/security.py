@@ -90,7 +90,16 @@ def _extract_identity_from_unverified_token(token: str) -> "FirebaseIdentity":
 class FirebaseIdentity:
     """The verified caller identity extracted from a Firebase ID token or app session token."""
     uid: str
+    # Only populated for real Firebase ID tokens (phone-auth claim); app session
+    # tokens carry no phone number, so callers must treat this as optional.
     phone_number: Optional[str] = None
+
+
+async def get_current_firebase_identity(authorization: Optional[str] = Header(None)) -> FirebaseIdentity:
+    """
+    Verifies the Firebase ID token from the `Authorization: Bearer <token>` header
+    and returns the caller's real Firebase UID plus phone number (when available).
+    """
 
 
 async def get_current_firebase_identity(authorization: Optional[str] = Header(None)) -> FirebaseIdentity:
@@ -138,6 +147,9 @@ async def get_current_firebase_identity(authorization: Optional[str] = Header(No
 async def get_current_firebase_uid(identity: FirebaseIdentity = Depends(get_current_firebase_identity)) -> str:
     """Back-compat dependency for routes that only need the UID."""
     return identity.uid
+
+
+
 def hash_password(password: str) -> str:
     """Hash a password using PBKDF2 with SHA-256 and a random 16-byte salt."""
     salt = os.urandom(16)

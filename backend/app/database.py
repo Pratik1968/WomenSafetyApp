@@ -3,6 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
+# Explicitly load .env from root directory or ai-service directory
 ROOT_DIR = Path(__file__).resolve().parent
 ai_service_env = ROOT_DIR / "ai-service" / ".env"
 root_env = ROOT_DIR / ".env"

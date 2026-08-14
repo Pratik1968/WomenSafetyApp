@@ -206,6 +206,7 @@ export function HistoryScreen({
 }
 
 
+
 const STEP_LABELS: Record<string, { title: string; tone: TimelineTone }> = {
   SOS_TRIGGERED: { title: "SOS triggered", tone: "emergency" },
   LOCATION_ACQUIRED: { title: "Location acquired", tone: "brand" },

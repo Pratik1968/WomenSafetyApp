@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = "women-safety-3d446"
     FIREBASE_STORAGE_BUCKET: Optional[str] = "women-safety-3d446.appspot.com"
     FIREBASE_SERVICE_ACCOUNT_PATH: str = "credentials/firebase-service-account.json"
+    # Set in serverless environments (e.g. Lambda) instead of shipping a credentials file in the
+    # deployment package: the raw service-account JSON content, as a single-line string.
+    FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     
     # Database
     DATABASE_URL: str = "sqlite:///./women_safety.db"

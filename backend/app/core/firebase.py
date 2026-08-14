@@ -1,3 +1,5 @@
+import json
+
 from app.core.config import settings
 from app.core.logging import logger
 
@@ -22,8 +24,24 @@ def initialize_firebase():
         logger.warning("firebase_admin package not installed in active Python environment. Running in FCM dev/mock mode.")
         return None
 
+    # Serverless environments (Lambda) set the service-account JSON directly as an env var
+    # rather than shipping a credentials file in the deployment package — check that first.
+    if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
+        try:
+            cred_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            cred = credentials.Certificate(cred_dict)
+            _firebase_app = firebase_admin.initialize_app(cred, {
+                "projectId": settings.FIREBASE_PROJECT_ID,
+                "storageBucket": settings.FIREBASE_STORAGE_BUCKET
+            })
+            logger.info("Firebase Admin SDK initialized successfully from FIREBASE_SERVICE_ACCOUNT_JSON env var")
+            return _firebase_app
+        except Exception as e:
+            logger.warning(f"Failed to initialize Firebase Admin SDK from FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+            return None
+
     cred_path = settings.absolute_firebase_credentials_path
-    
+
     if cred_path.exists():
         try:
             cred = credentials.Certificate(str(cred_path))

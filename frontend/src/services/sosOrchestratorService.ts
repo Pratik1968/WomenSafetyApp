@@ -468,7 +468,9 @@ export async function triggerSOS(source: SOSTriggerSource): Promise<string> {
             if (!alert) return;
             return appendLog(incidentId, alert.eventType, { detail: alert.detail });
           })
-          .catch(() => {});
+          .catch(() => {
+            // Best-effort — a failed behavior check must never affect the SOS pipeline.
+          });
       }
     );
     await appendLog(incidentId, "LIVE_TRACKING_STARTED", {});

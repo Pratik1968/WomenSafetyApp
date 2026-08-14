@@ -1,8 +1,9 @@
 import { FakeCallScreen } from "../screens/FakeCallScreen";
 import { IncomingCallScreen } from "../screens/IncomingCallScreen";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Platform, Linking } from "react-native";
+import { Alert, Platform } from "react-native";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+import * as Linking from "expo-linking";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { SplashScreen } from "../screens/SplashScreen";
@@ -90,15 +91,16 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminIncidents: undefined;
+  FaceVerification: undefined;
+  FaceRegistration: undefined;
   VoiceTriggerConfig: undefined;
   VoiceTraining: undefined;
   FamilyLiveTracking: { sessionId?: string } | undefined;
-  FaceVerification: undefined;
-  FaceRegistration: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 type P<T extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, T>;
+
 function SplashRouteScreen({ navigation }: P<"Splash">) {
   useEffect(() => {
     const t = setTimeout(() => navigation.replace("Onboarding"), 2600);
@@ -325,7 +327,12 @@ function HomeRouteScreen({ navigation }: P<"Home">) {
         else if (action === "Contacts") navigation.navigate("Profile");
         else if (action === "Fake Call") navigation.navigate("IncomingCall");
         else if (action === "Register Face") navigation.navigate("FaceRegistration");
+
         else if (action === "Voice SOS") navigation.navigate("VoiceTriggerConfig");
+        else if (action === "Fake Call") navigation.navigate("IncomingCall");
+      }}
+      onQuickActionLongPress={(action: string) => {
+        if (action === "Fake Call") navigation.navigate("FakeCall");
       }}
       onQuickActionLongPress={(action: string) => {
         if (action === "Fake Call") navigation.navigate("FakeCall");
@@ -425,6 +432,27 @@ function SosRouteScreen({ navigation, route }: P<"Sos">) {
   );
 }
 
+function FaceVerificationRouteScreen({
+  navigation,
+}: P<"FaceVerification">) {
+  return (
+    <FaceVerificationScreen
+      onVerified={() => navigation.replace("Home")}
+      onFailed={() => navigation.goBack()}
+    />
+  );
+}
+
+function FaceRegistrationRouteScreen({
+  navigation,
+}: P<"FaceRegistration">) {
+  return (
+    <FaceRegistrationScreen
+      onDone={() => navigation.goBack()}
+    />
+  );
+}
+
 function ReportRouteScreen({ navigation }: P<"Report">) {
   return (
     <ReportScreen
@@ -435,22 +463,7 @@ function ReportRouteScreen({ navigation }: P<"Report">) {
   );
 }
 
-function FaceVerificationRouteScreen({ navigation }: P<"FaceVerification">) {
-  return (
-    <FaceVerificationScreen
-      onVerified={() => navigation.replace("Home")}
-      onFailed={() => navigation.goBack()}
-    />
-  );
-}
 
-function FaceRegistrationRouteScreen({ navigation }: P<"FaceRegistration">) {
-  return (
-    <FaceRegistrationScreen
-      onDone={() => navigation.goBack()}
-    />
-  );
-}
 
 function CommunityReportsRouteScreen({ navigation }: P<"CommunityReports">) {
   return <CommunityReportsScreen onBack={() => navigation.goBack()} onReportNew={() => navigation.navigate("Report")} />;
@@ -485,7 +498,6 @@ function FamilyLiveTrackingRouteScreen({ navigation, route }: P<"FamilyLiveTrack
     />
   );
 }
-
 function AdminDashboardRouteScreen({ navigation }: P<"AdminDashboard">) {
   return (
     <AdminDashboardScreen
@@ -563,7 +575,7 @@ function MobileApp() {
   }, [navigationRef]);
 
   const linking = {
-    prefixes: ["aegis://", "aegiswomensafety://"],
+    prefixes: [Linking.createURL("/"), "aegis://", "aegiswomensafety://"],
     config: {
       screens: {
         IncomingCall: "fakecall",

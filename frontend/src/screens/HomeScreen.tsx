@@ -52,12 +52,12 @@ const USER = {
 
 const QUICK_ACTIONS = [
   { label: "Safe Route", icon: RouteIcon },
-  { label: "Fake Call", icon: PhoneCall },
   { label: "Nearby Police", icon: ShieldCheck },
   { label: "Hospitals", icon: Ambulance },
   { label: "AI Assistant", icon: Sparkles },
   { label: "Report Area", icon: Flag },
   { label: "Contacts", icon: Users },
+  { label: "Fake Call", icon: PhoneCall },
   { label: "Register Face", icon: UserRoundPlus },
 ];
 
